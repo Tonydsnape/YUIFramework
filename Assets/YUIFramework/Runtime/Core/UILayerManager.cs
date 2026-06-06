@@ -24,7 +24,13 @@ namespace YUIFramework
 
         public RectTransform GetLayer(UILayer layer)
         {
-            return _uiRoot.GetLayerRoot(layer);
+            var root = _uiRoot.GetLayerRoot(layer);
+            if (root == null)
+            {
+                throw new InvalidOperationException($"UILayer root is null: {layer}");
+            }
+
+            return root;
         }
 
         public void AddToLayer(UILayer layer, RectTransform view)
@@ -34,7 +40,8 @@ namespace YUIFramework
                 throw new ArgumentNullException(nameof(view));
             }
 
-            view.SetParent(GetLayer(layer), false);
+            var layerRoot = GetLayer(layer);
+            view.SetParent(layerRoot, false);
             view.SetAsLastSibling();
 
             var canvas = view.GetComponent<Canvas>();

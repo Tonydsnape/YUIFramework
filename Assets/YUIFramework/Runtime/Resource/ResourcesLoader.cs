@@ -17,15 +17,24 @@ namespace YUIFramework
                 await Task.Yield();
             }
 
-            return request.asset as GameObject;
+            var prefab = request.asset as GameObject;
+            if (prefab == null)
+            {
+                Debug.LogError(
+                    $"[YUIFramework] ResourcesLoader.LoadPrefabAsync 加载失败: key=\"{key}\"。请确认使用 Resources 相对路径，例如 \"UI/Pages/MainMenuPage\"，且资源文件位于 \"Assets/Resources/UI/Pages/MainMenuPage.prefab\"。");
+            }
+
+            return prefab;
         }
 
         public void Release(string key, GameObject instance)
         {
-            if (instance != null)
+            if (instance == null)
             {
-                Object.Destroy(instance);
+                return;
             }
+
+            Object.Destroy(instance);
         }
     }
 }
