@@ -1,5 +1,8 @@
 namespace YUIFramework
 {
+    /// <summary>
+    /// UI Context 生命周期状态。
+    /// </summary>
     public enum UIContextState
     {
         None,
