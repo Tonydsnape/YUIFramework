@@ -1,6 +1,6 @@
 # YUIFramework
 
-YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架 + P2 栈式页面导航**。
+YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架 + P2 栈式页面导航 + P3 资源加载体系增强**。
 
 设计灵感来自：
 - 原神 `MoleMole.UIManager`（Context / Layer / 配置驱动）
@@ -14,11 +14,13 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 当前实现包含：
 - P1 核心骨架（✅）
 - P2 栈式页面导航 `UINavigator`（✅）
+- P3 资源加载体系增强（✅，Resources + 可选 Addressables）
 
 核心能力：
 - 分层系统（`UILayer` + 每层独立 Canvas）
 - Context 生命周期（`OnInit -> OnShow -> OnHide -> OnClose -> OnDestroy`）
 - 资源加载抽象（`IResourceLoader` + `ResourcesLoader`）
+- 可选 Addressables 接入（`AddressablesLoader`，按包版本自动启用）
 - 核心调度器（`UIManager`）
 - Page 栈导航（`Push / Pop / Replace / Back`）
 - 纯代码示例（无需提交 prefab / scene 二进制资源）
@@ -120,11 +122,61 @@ await UIManager.Instance.Navigator.ReplaceAsync<LoginPageContext>();
 - Widget：常驻，不进导航栈。
 - Dialog：弹窗，不进导航栈，可直接使用 `UIManager.OpenAsync<T>()` 管理。
 
+## P3 资源加载体系
+
+### 使用 ResourcesLoader
+
+```csharp
+UIManager.Instance.Init(new ResourcesLoader());
+```
+
+`PrefabKey` 推荐写法：
+
+```csharp
+PrefabKey = "UI/Pages/MainMenuPage"
+```
+
+Resources 资源文件路径示例：
+
+```text
+Assets/Resources/UI/Pages/MainMenuPage.prefab
+```
+
+### 使用 AddressablesLoader（仅安装 Addressables 后）
+
+```csharp
+#if YUIFRAMEWORK_ADDRESSABLES
+UIManager.Instance.Init(new AddressablesLoader());
+#endif
+```
+
+说明：
+- Addressables 包安装后，`YUIFRAMEWORK_ADDRESSABLES` 会通过 asmdef 的 versionDefines 自动生效。
+- 未安装 Addressables 时，`AddressablesLoader` 不会参与编译，不影响项目构建。
+- 推荐将 UI Prefab Address 设为与 Resources 同风格的 key（如 `UI/Pages/MainMenuPage`）。
+
+### 如何避免错误路径
+
+避免把 `PrefabKey` 写成：
+- `Assets/Resources/UI/Pages/MainMenuPage.prefab`
+- `\\UI\\Pages\\MainMenuPage.prefab`
+
+`ResourcesLoader` 会对常见错误做规范化与日志提示，但建议在配置阶段直接使用逻辑 key。
+
+### Resources vs Addressables
+
+| 对比项 | ResourcesLoader | AddressablesLoader |
+|---|---|---|
+| 是否开箱可用 | ✅ Unity 内置 | ⚠️ 需安装 `com.unity.addressables` |
+| Key 约定 | `UI/Pages/MainMenuPage` | Address（建议同上） |
+| 包体与更新策略 | 简单，适合小中型项目 | 更灵活，适合中大型项目 |
+| 句柄管理 | 无需额外句柄 | 内置 handle + 引用计数释放 |
+
 ## 路线图
 
 - P1 核心骨架（✅）
 - P2 栈式导航 `UINavigator`（✅）
-- P3 Addressables 资源加载
+- P3 资源加载体系增强（✅，Resources + 可选 Addressables）
 - P4 对象池 / UI 缓存增强
 - P5 消息中心
 - P6 虚拟列表
@@ -135,4 +187,4 @@ await UIManager.Instance.Navigator.ReplaceAsync<LoginPageContext>();
 
 ---
 
-当前仓库已落地 P1 + P2，P3 及后续模块待实现。
+当前仓库已落地 P1 + P2 + P3，P4 及后续模块待实现。
