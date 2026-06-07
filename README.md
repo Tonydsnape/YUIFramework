@@ -1,6 +1,6 @@
 # YUIFramework
 
-YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架**。
+YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架 + P2 栈式页面导航**。
 
 设计灵感来自：
 - 原神 `MoleMole.UIManager`（Context / Layer / 配置驱动）
@@ -11,11 +11,16 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 
 ## 当前阶段
 
-本 PR 仅实现 **P1 核心骨架（✅）**，包含：
+当前实现包含：
+- P1 核心骨架（✅）
+- P2 栈式页面导航 `UINavigator`（✅）
+
+核心能力：
 - 分层系统（`UILayer` + 每层独立 Canvas）
 - Context 生命周期（`OnInit -> OnShow -> OnHide -> OnClose -> OnDestroy`）
 - 资源加载抽象（`IResourceLoader` + `ResourcesLoader`）
 - 核心调度器（`UIManager`）
+- Page 栈导航（`Push / Pop / Replace / Back`）
 - 纯代码示例（无需提交 prefab / scene 二进制资源）
 
 ## 架构总览
@@ -96,15 +101,29 @@ public class HelloUIBootstrap : MonoBehaviour
             FullScreen = true,
         });
 
-        await uiManager.OpenAsync<SampleHelloPage>("Hello YUIFramework!");
+        await uiManager.Navigator.PushAsync<SampleHelloPage>("Hello YUIFramework!");
     }
 }
 ```
 
+## P2 用法示例
+
+```csharp
+await UIManager.Instance.Navigator.PushAsync<MainMenuPageContext>();
+await UIManager.Instance.Navigator.PushAsync<SettingPageContext>();
+await UIManager.Instance.Navigator.PopAsync();
+await UIManager.Instance.Navigator.ReplaceAsync<LoginPageContext>();
+```
+
+类型职责：
+- Page：进入 `Navigator` 栈。
+- Widget：常驻，不进导航栈。
+- Dialog：弹窗，不进导航栈，可直接使用 `UIManager.OpenAsync<T>()` 管理。
+
 ## 路线图
 
-- P1 核心骨架（本 PR，✅）
-- P2 栈式导航 `UINavigator`
+- P1 核心骨架（✅）
+- P2 栈式导航 `UINavigator`（✅）
 - P3 Addressables 资源加载
 - P4 对象池 / UI 缓存增强
 - P5 消息中心
@@ -116,4 +135,4 @@ public class HelloUIBootstrap : MonoBehaviour
 
 ---
 
-当前仓库仅落地 P1，不包含 P2 及后续模块实现。
+当前仓库已落地 P1 + P2，P3 及后续模块待实现。

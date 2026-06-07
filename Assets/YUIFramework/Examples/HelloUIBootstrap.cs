@@ -7,6 +7,8 @@ namespace YUIFramework
     /// </summary>
     public class HelloUIBootstrap : MonoBehaviour
     {
+        private bool _isHandlingBackNavigation;
+
         private async void Start()
         {
             var uiManager = UIManager.Instance;
@@ -19,8 +21,34 @@ namespace YUIFramework
                 CacheOnClose = false,
                 FullScreen = true,
             });
+            uiManager.Register<SecondSamplePage>(new UIConfig
+            {
+                Id = "SecondSamplePage",
+                PrefabKey = "SecondSamplePage",
+                Layer = UILayer.Normal,
+                CacheOnClose = false,
+                FullScreen = true,
+            });
 
-            await uiManager.OpenAsync<SampleHelloPage>("Hello YUIFramework!");
+            await uiManager.Navigator.PushAsync<SampleHelloPage>("Hello YUIFramework!");
+        }
+
+        private async void Update()
+        {
+            if (_isHandlingBackNavigation || !Input.GetKeyDown(KeyCode.Escape))
+            {
+                return;
+            }
+
+            _isHandlingBackNavigation = true;
+            try
+            {
+                await UIManager.Instance.Navigator.BackAsync();
+            }
+            finally
+            {
+                _isHandlingBackNavigation = false;
+            }
         }
     }
 }
