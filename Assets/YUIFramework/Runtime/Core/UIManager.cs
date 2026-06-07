@@ -27,7 +27,6 @@ namespace YUIFramework
 
         private UIManager()
         {
-            MessageCenter = new UIMessageCenter();
         }
 
         public void Init(IResourceLoader loader, IUIObjectPool pool = null)
