@@ -47,7 +47,8 @@ namespace YUIFramework
                 target.localScale = Vector3.LerpUnclamped(originalScale, endScale, progress);
             });
 
-            target.localScale = endScale;
+            // 关闭动画完成后恢复原始缩放，避免复用或重新显示时状态漂移。
+            target.localScale = originalScale;
         }
 
         private static Vector3 GetOriginalScale(RectTransform target)

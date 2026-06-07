@@ -41,7 +41,8 @@ namespace YUIFramework
             {
                 canvasGroup.alpha = Mathf.LerpUnclamped(1f, 0f, progress);
             });
-            canvasGroup.alpha = 0f;
+            // 动画结束后恢复到可见状态，避免对象复用时残留透明度。
+            canvasGroup.alpha = 1f;
         }
 
         private static CanvasGroup GetOrAddCanvasGroup(RectTransform target)
