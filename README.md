@@ -1,6 +1,6 @@
 # YUIFramework
 
-YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架 + P2 栈式页面导航 + P3 资源加载体系增强 + P4 UI 对象池缓存增强 + P5 UI 消息中心 + P6 轻量虚拟列表 + P7 轻量转场动画**。
+YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架 + P2 栈式页面导航 + P3 资源加载体系增强 + P4 UI 对象池缓存增强 + P5 UI 消息中心 + P6 轻量虚拟列表 + P7 轻量转场动画 + P8 轻量 MVVM / 数据绑定基础层**。
 
 设计灵感来自：
 - 原神 `MoleMole.UIManager`（Context / Layer / 配置驱动）
@@ -19,6 +19,7 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 - P5 UI 消息中心 / 事件总线（✅）
 - P6 虚拟列表 / 大量 UI 元素优化（✅）
 - P7 UI 转场动画 / 页面过渡系统（✅）
+- P8 MVVM / 数据绑定基础层（✅）
 
 核心能力：
 - 分层系统（`UILayer` + 每层独立 Canvas）
@@ -30,6 +31,7 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 - UI 缓存池（`CacheOnClose` + `MaxPoolSize`）
 - 轻量虚拟列表（`UIVirtualList`，固定尺寸 item 复用）
 - 轻量转场动画（Fade / Scale / Slide）
+- 轻量 MVVM（`ObservableProperty` + `UIDataBinding`）
 - 纯代码示例（无需提交 prefab / scene 二进制资源）
 
 ## 架构总览
@@ -324,6 +326,39 @@ uiManager.Register<MainMenuPageContext>(new UIConfig
 - `HideWithoutClose`（栈下页面临时隐藏）保持原行为，不播放 close transition。
 - 对象池复用时：出池播放 Show，入池前播放 Hide。
 
+## P8 MVVM / 数据绑定基础层
+
+P8 新增 `Runtime/MVVM`，提供轻量可观察属性、集合和 uGUI 代码式绑定：
+
+- `ObservableProperty<T>`：值变化通知
+- `ObservableCollection<T>`：集合变更通知（Add / Remove / Clear / Reset）
+- `ViewModelBase`：统一跟踪并释放订阅
+- `UIDataBinding`：绑定 `Text / Toggle / Slider`
+- 绑定模式：`OneWay / TwoWay / OneTime`
+
+基础示例：
+
+```csharp
+public sealed class LoginViewModel : ViewModelBase
+{
+    public ObservableProperty<string> UserName { get; } = new ObservableProperty<string>(string.Empty);
+    public ObservableProperty<bool> RememberMe { get; } = new ObservableProperty<bool>(false);
+}
+
+protected override void HandleInit()
+{
+    var vm = new LoginViewModel();
+    SetViewModel(vm);
+    TrackBinding(UIDataBinding.BindText(titleText, vm.UserName));
+    TrackBinding(UIDataBinding.BindToggle(toggle, vm.RememberMe));
+}
+```
+
+生命周期说明：
+- `BaseContext.OnDestroy` 会自动调用 `ClearBindings()` 与 `ClearViewModel()`。
+- 入池对象不会触发 `OnDestroy`，因此 ViewModel 与绑定会保留。
+- 若业务要求隐藏即解绑，可在 `HandleHide` 手动调用 `ClearBindings()` / `ClearViewModel()`。
+
 ## 路线图
 
 - P1 核心骨架（✅）
@@ -333,10 +368,9 @@ uiManager.Register<MainMenuPageContext>(new UIConfig
 - P5 消息中心（✅）
 - P6 虚拟列表 / 大量 UI 元素优化（✅）
 - P7 转场动画（✅）
-- P8 MVVM / 数据绑定
-- P9 Editor 工具
-- P10 示例与测试完善
+- P8 MVVM / 数据绑定（✅）
+- P9 Editor 工具 / 代码生成 / 测试完善（⏳）
 
 ---
 
-当前仓库已落地 P1 + P2 + P3 + P4 + P5 + P6 + P7，P8 及后续模块待实现。
+当前仓库已落地 P1 + P2 + P3 + P4 + P5 + P6 + P7 + P8，P9 及后续模块待实现。

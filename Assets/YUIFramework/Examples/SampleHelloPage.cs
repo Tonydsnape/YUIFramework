@@ -13,10 +13,12 @@ namespace YUIFramework
         private Button _closeButton;
         private Button _nextButton;
         private Button _virtualListButton;
+        private Button _mvvmButton;
         private Button _publishButton;
         private UnityAction _closeAction;
         private UnityAction _nextAction;
         private UnityAction _virtualListAction;
+        private UnityAction _mvvmAction;
         private UnityAction _publishAction;
 
         protected override void HandleInit()
@@ -117,6 +119,30 @@ namespace YUIFramework
             _virtualListAction = async () => await UIManager.Instance.Navigator.PushAsync<VirtualListSamplePage>();
             _virtualListButton.onClick.AddListener(_virtualListAction);
 
+            var mvvmRect = CreateUIObject("MvvmSampleButton", panel);
+            mvvmRect.sizeDelta = new Vector2(360f, 80f);
+            mvvmRect.anchorMin = new Vector2(0.5f, 0f);
+            mvvmRect.anchorMax = new Vector2(0.5f, 0f);
+            mvvmRect.pivot = new Vector2(0.5f, 0f);
+            mvvmRect.anchoredPosition = new Vector2(0f, 480f);
+
+            var mvvmImage = mvvmRect.gameObject.AddComponent<Image>();
+            mvvmImage.color = new Color(0.25f, 0.24f, 0.42f, 0.95f);
+            _mvvmButton = mvvmRect.gameObject.AddComponent<Button>();
+            _mvvmButton.targetGraphic = mvvmImage;
+
+            var mvvmLabelRect = CreateUIObject("Label", mvvmRect);
+            StretchFull(mvvmLabelRect);
+            var mvvmLabel = mvvmLabelRect.gameObject.AddComponent<Text>();
+            mvvmLabel.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            mvvmLabel.alignment = TextAnchor.MiddleCenter;
+            mvvmLabel.color = Color.white;
+            mvvmLabel.fontSize = 26;
+            mvvmLabel.text = "Open MVVM Sample";
+
+            _mvvmAction = async () => await UIManager.Instance.Navigator.PushAsync<MvvmSamplePage>();
+            _mvvmButton.onClick.AddListener(_mvvmAction);
+
             var publishRect = CreateUIObject("PublishMessageButton", panel);
             publishRect.sizeDelta = new Vector2(320f, 80f);
             publishRect.anchorMin = new Vector2(0.5f, 0f);
@@ -167,6 +193,11 @@ namespace YUIFramework
             if (_virtualListButton != null && _virtualListAction != null)
             {
                 _virtualListButton.onClick.RemoveListener(_virtualListAction);
+            }
+
+            if (_mvvmButton != null && _mvvmAction != null)
+            {
+                _mvvmButton.onClick.RemoveListener(_mvvmAction);
             }
 
             if (_publishButton != null && _publishAction != null)

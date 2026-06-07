@@ -11,6 +11,8 @@ namespace YUIFramework
     {
         private bool _initialized;
         private readonly List<UIMessageToken> _messageTokens = new List<UIMessageToken>();
+        private readonly List<IDisposable> _bindingTokens = new List<IDisposable>();
+        private IViewModel _viewModel;
 
         public string Id { get; internal set; }
         public UILayer Layer { get; internal set; }
@@ -61,6 +63,8 @@ namespace YUIFramework
         {
             State = UIContextState.Destroyed;
             UnsubscribeAllMessages();
+            ClearBindings();
+            ClearViewModel();
             HandleDestroy();
         }
 
@@ -127,6 +131,76 @@ namespace YUIFramework
 
             _messageTokens.Clear();
             UIManager.Instance.MessageCenter.UnsubscribeOwner(this);
+        }
+
+        /// <summary>
+        /// 设置当前 Context 的 ViewModel。替换时会释放旧实例。
+        /// </summary>
+        protected void SetViewModel(IViewModel viewModel)
+        {
+            if (ReferenceEquals(_viewModel, viewModel))
+            {
+                return;
+            }
+
+            ClearViewModel();
+            _viewModel = viewModel;
+        }
+
+        protected T GetViewModel<T>() where T : class, IViewModel
+        {
+            return _viewModel as T;
+        }
+
+        /// <summary>
+        /// 追踪绑定 token，OnDestroy 自动释放。
+        /// </summary>
+        protected void TrackBinding(IDisposable bindingToken)
+        {
+            if (bindingToken == null)
+            {
+                return;
+            }
+
+            if (bindingToken is BindingToken token && token.IsDisposed)
+            {
+                return;
+            }
+
+            _bindingTokens.Add(bindingToken);
+        }
+
+        protected void ClearBindings()
+        {
+            for (var i = _bindingTokens.Count - 1; i >= 0; i--)
+            {
+                try
+                {
+                    _bindingTokens[i]?.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+            }
+
+            _bindingTokens.Clear();
+        }
+
+        protected void ClearViewModel(bool dispose = true)
+        {
+            if (_viewModel == null)
+            {
+                return;
+            }
+
+            var vm = _viewModel;
+            _viewModel = null;
+
+            if (dispose)
+            {
+                vm.Dispose();
+            }
         }
     }
 }

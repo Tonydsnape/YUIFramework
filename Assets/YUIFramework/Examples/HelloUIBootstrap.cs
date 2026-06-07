@@ -53,6 +53,19 @@ namespace YUIFramework
                 HideDuration = 0.15f,
                 StartScale = 0.92f,
             });
+            uiManager.Register<MvvmSamplePage>(new UIConfig
+            {
+                Id = "MvvmSamplePage",
+                PrefabKey = "MvvmSamplePage",
+                Layer = UILayer.Normal,
+                CacheOnClose = true,
+                MaxPoolSize = 1,
+                FullScreen = true,
+                UseTransition = true,
+                TransitionType = UITransitionType.Fade,
+                ShowDuration = 0.18f,
+                HideDuration = 0.15f,
+            });
 
             await uiManager.Navigator.PushAsync<SampleHelloPage>("Hello YUIFramework!");
         }
