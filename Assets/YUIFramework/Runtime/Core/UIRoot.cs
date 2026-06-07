@@ -13,6 +13,7 @@ namespace YUIFramework
     {
         private static UIRoot _instance;
         private readonly Dictionary<UILayer, RectTransform> _layerRoots = new Dictionary<UILayer, RectTransform>();
+        private bool _initialized;
 
         public static UIRoot Instance
         {
@@ -28,6 +29,8 @@ namespace YUIFramework
                     }
                 }
 
+                _instance.EnsureInitialized();
+
                 return _instance;
             }
         }
@@ -42,9 +45,7 @@ namespace YUIFramework
 
             _instance = this;
             DontDestroyOnLoad(gameObject);
-            EnsureRootComponents();
-            EnsureEventSystem();
-            BuildLayerRoots();
+            EnsureInitialized();
         }
 
         public RectTransform GetLayerRoot(UILayer layer)
@@ -107,6 +108,19 @@ namespace YUIFramework
                 layerObject.AddComponent<GraphicRaycaster>();
                 _layerRoots[layer] = rect;
             }
+        }
+
+        private void EnsureInitialized()
+        {
+            if (_initialized)
+            {
+                return;
+            }
+
+            EnsureRootComponents();
+            EnsureEventSystem();
+            BuildLayerRoots();
+            _initialized = true;
         }
     }
 }

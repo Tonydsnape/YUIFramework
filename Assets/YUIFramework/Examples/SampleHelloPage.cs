@@ -11,7 +11,9 @@ namespace YUIFramework
     {
         private Text _messageText;
         private Button _closeButton;
+        private Button _nextButton;
         private UnityAction _closeAction;
+        private UnityAction _nextAction;
 
         protected override void HandleInit()
         {
@@ -55,8 +57,31 @@ namespace YUIFramework
             label.fontSize = 28;
             label.text = "Close";
 
+            var nextRect = CreateUIObject("NextButton", panel);
+            nextRect.sizeDelta = new Vector2(260f, 80f);
+            nextRect.anchorMin = new Vector2(0.5f, 0f);
+            nextRect.anchorMax = new Vector2(0.5f, 0f);
+            nextRect.pivot = new Vector2(0.5f, 0f);
+            nextRect.anchoredPosition = new Vector2(0f, 180f);
+
+            var nextImage = nextRect.gameObject.AddComponent<Image>();
+            nextImage.color = new Color(0.24f, 0.24f, 0.24f, 0.95f);
+            _nextButton = nextRect.gameObject.AddComponent<Button>();
+            _nextButton.targetGraphic = nextImage;
+
+            var nextLabelRect = CreateUIObject("Label", nextRect);
+            StretchFull(nextLabelRect);
+            var nextLabel = nextLabelRect.gameObject.AddComponent<Text>();
+            nextLabel.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            nextLabel.alignment = TextAnchor.MiddleCenter;
+            nextLabel.color = Color.white;
+            nextLabel.fontSize = 28;
+            nextLabel.text = "Next";
+
             _closeAction = async () => await UIManager.Instance.CloseAsync(this);
+            _nextAction = async () => await UIManager.Instance.Navigator.PushAsync<SecondSamplePage>("Welcome to SecondSamplePage");
             _closeButton.onClick.AddListener(_closeAction);
+            _nextButton.onClick.AddListener(_nextAction);
         }
 
         protected override void HandleShow(object args)
@@ -76,6 +101,11 @@ namespace YUIFramework
             if (_closeButton != null && _closeAction != null)
             {
                 _closeButton.onClick.RemoveListener(_closeAction);
+            }
+
+            if (_nextButton != null && _nextAction != null)
+            {
+                _nextButton.onClick.RemoveListener(_nextAction);
             }
         }
 

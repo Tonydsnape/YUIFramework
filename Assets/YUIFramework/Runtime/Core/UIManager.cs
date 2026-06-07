@@ -21,11 +21,13 @@ namespace YUIFramework
         private bool _initialized;
 
         public static UIManager Instance => LazyInstance.Value;
+        public UINavigator Navigator { get; private set; }
 
         public void Init(IResourceLoader loader)
         {
             _resourceLoader = loader ?? throw new ArgumentNullException(nameof(loader));
             _layerManager = new UILayerManager(UIRoot.Instance);
+            Navigator ??= new UINavigator(this);
             _initialized = true;
         }
 
@@ -167,6 +169,43 @@ namespace YUIFramework
             }
 
             return context.ViewObject.activeInHierarchy;
+        }
+
+        internal void HideWithoutClose(BaseContext ctx)
+        {
+            EnsureInitialized();
+
+            if (ctx == null)
+            {
+                return;
+            }
+
+            ctx.OnHide();
+            if (ctx.ViewObject != null)
+            {
+                ctx.ViewObject.SetActive(false);
+            }
+        }
+
+        internal void ShowWithoutOpen(BaseContext ctx, object args = null)
+        {
+            EnsureInitialized();
+
+            if (ctx == null)
+            {
+                return;
+            }
+
+            if (ctx.ViewObject != null)
+            {
+                ctx.ViewObject.SetActive(true);
+            }
+
+            if (ctx.View != null && ctx.View.RectTransform != null)
+            {
+                _layerManager.AddToLayer(ctx.Layer, ctx.View.RectTransform);
+            }
+            ctx.OnShow(args);
         }
 
         private void EnsureInitialized()
