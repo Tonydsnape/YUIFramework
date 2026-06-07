@@ -1,6 +1,6 @@
 # YUIFramework
 
-YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架 + P2 栈式页面导航 + P3 资源加载体系增强**。
+YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架 + P2 栈式页面导航 + P3 资源加载体系增强 + P4 UI 对象池缓存增强**。
 
 设计灵感来自：
 - 原神 `MoleMole.UIManager`（Context / Layer / 配置驱动）
@@ -15,6 +15,7 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 - P1 核心骨架（✅）
 - P2 栈式页面导航 `UINavigator`（✅）
 - P3 资源加载体系增强（✅，Resources + 可选 Addressables）
+- P4 UI 对象池 / 缓存增强（✅）
 
 核心能力：
 - 分层系统（`UILayer` + 每层独立 Canvas）
@@ -23,6 +24,7 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 - 可选 Addressables 接入（`AddressablesLoader`，按包版本自动启用）
 - 核心调度器（`UIManager`）
 - Page 栈导航（`Push / Pop / Replace / Back`）
+- UI 缓存池（`CacheOnClose` + `MaxPoolSize`）
 - 纯代码示例（无需提交 prefab / scene 二进制资源）
 
 ## 架构总览
@@ -77,6 +79,12 @@ OnInit -> OnShow -> OnHide -> OnClose -> OnDestroy
 - `OnClose`：关闭流程中的业务收尾阶段。
 - `OnDestroy`：对象释放前触发；缓存关闭策略下可能暂不触发。
 
+P4 生命周期语义：
+- 首次创建：`OnInit -> OnShow`
+- 关闭入池：`OnHide -> OnClose -> SetActive(false)`
+- 池中取回：`SetActive(true) -> OnShow`（不会重复 `OnInit`）
+- 池满/不缓存：`OnDestroy -> Release`
+
 ## 快速开始
 
 1. 在场景中创建空物体，挂载 `HelloUIBootstrap`。
@@ -99,7 +107,8 @@ public class HelloUIBootstrap : MonoBehaviour
             Id = "HelloPage",
             PrefabKey = "SampleHelloPage",
             Layer = UILayer.Normal,
-            CacheOnClose = false,
+            CacheOnClose = true,
+            MaxPoolSize = 1,
             FullScreen = true,
         });
 
@@ -172,13 +181,55 @@ UIManager.Instance.Init(new AddressablesLoader());
 | 包体与更新策略 | 简单，适合小中型项目 | 更灵活，适合中大型项目 |
 | 句柄管理 | 无需额外句柄 | 内置 handle + 引用计数释放 |
 
+## P4 对象池 / UI 缓存增强
+
+`CacheOnClose` 在 P4 中升级为对象池语义：关闭后会从 active contexts 移除并尝试入池。
+
+初始化方式（两种都可用）：
+
+```csharp
+UIManager.Instance.Init(new ResourcesLoader());
+UIManager.Instance.Init(new ResourcesLoader(), new UIObjectPool());
+```
+
+说明：重复 `Init` 不会清空已注册配置和 active contexts；如果传入新的 `IUIObjectPool`，会替换旧池并释放旧池缓存对象。
+
+基础配置：
+
+```csharp
+CacheOnClose = true,
+MaxPoolSize = 1,
+```
+
+额外字段：
+- `MaxPoolSize`：每个 UI 类型最大池容量，`<= 0` 视为不缓存。
+- `PreloadCount`：预加载数量预留字段（当前仅保留配置）。
+
+适合缓存：
+- 高频页面
+- HUD
+- 背包/角色面板
+- 初始化复杂但会重复打开的界面
+
+不适合缓存：
+- 一次性弹窗
+- 很少打开的大型页面
+- 强绑定临时数据且释放成本低的 UI
+
+清理缓存池：
+
+```csharp
+UIManager.Instance.ClearPool<MainMenuPageContext>();
+UIManager.Instance.ClearAllPools();
+```
+
 ## 路线图
 
 - P1 核心骨架（✅）
 - P2 栈式导航 `UINavigator`（✅）
 - P3 资源加载体系增强（✅，Resources + 可选 Addressables）
-- P4 对象池 / UI 缓存增强
-- P5 消息中心
+- P4 对象池 / UI 缓存增强（✅）
+- P5 消息中心（⏳）
 - P6 虚拟列表
 - P7 转场动画
 - P8 MVVM / 数据绑定
@@ -187,4 +238,4 @@ UIManager.Instance.Init(new AddressablesLoader());
 
 ---
 
-当前仓库已落地 P1 + P2 + P3，P4 及后续模块待实现。
+当前仓库已落地 P1 + P2 + P3 + P4，P5 及后续模块待实现。

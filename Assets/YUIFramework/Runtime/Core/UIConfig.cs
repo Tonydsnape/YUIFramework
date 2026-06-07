@@ -23,6 +23,16 @@ namespace YUIFramework
         public bool CacheOnClose;
 
         /// <summary>
+        /// 同一 UI 类型最大缓存数量。小于等于 0 视为不缓存。
+        /// </summary>
+        public int MaxPoolSize = 1;
+
+        /// <summary>
+        /// 预加载数量（P4 先保留配置字段，后续可扩展预热逻辑）。
+        /// </summary>
+        public int PreloadCount;
+
+        /// <summary>
         /// 是否全屏（后续导航栈遮挡策略使用）。
         /// </summary>
         public bool FullScreen;

@@ -17,6 +17,7 @@ namespace YUIFramework
 
         protected override void HandleInit()
         {
+            Debug.Log("[SampleHelloPage] Init");
             var root = View.RectTransform;
             root.anchorMin = Vector2.zero;
             root.anchorMax = Vector2.one;
