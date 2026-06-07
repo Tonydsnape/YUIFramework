@@ -79,10 +79,27 @@ namespace YUIFramework
             var newContext = Activator.CreateInstance<T>();
             newContext.State = UIContextState.Loading;
 
-            var prefab = await _resourceLoader.LoadPrefabAsync(config.PrefabKey);
+            GameObject prefab;
+            var loaderType = _resourceLoader?.GetType().Name ?? "UnknownLoader";
+            try
+            {
+                prefab = await _resourceLoader.LoadPrefabAsync(config.PrefabKey);
+            }
+            catch (ResourceLoadException ex)
+            {
+                throw new InvalidOperationException(
+                    BuildPrefabLoadErrorMessage(contextType, config, ex.LoaderType, ex.DetailMessage), ex);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException(
+                    BuildPrefabLoadErrorMessage(contextType, config, loaderType, ex.Message), ex);
+            }
+
             if (prefab == null)
             {
-                throw new InvalidOperationException($"加载 UI Prefab 失败: key={config.PrefabKey}, type={contextType.Name}");
+                throw new InvalidOperationException(
+                    BuildPrefabLoadErrorMessage(contextType, config, loaderType, "Loader 返回了 null Prefab。"));
             }
 
             var instance = UnityEngine.Object.Instantiate(prefab);
@@ -214,6 +231,21 @@ namespace YUIFramework
             {
                 throw new InvalidOperationException("UIManager 尚未初始化。请先调用 Init(IResourceLoader)。");
             }
+        }
+
+        private static string BuildPrefabLoadErrorMessage(Type contextType, UIConfig config, string loaderType, string detail)
+        {
+            var message =
+                $"加载 UI Prefab 失败: type={contextType.Name}, id={config.Id}, key={config.PrefabKey}, loader={loaderType}。{detail}";
+
+            if (string.Equals(loaderType, nameof(ResourcesLoader), StringComparison.Ordinal))
+            {
+                var normalizedKey = ResourcePathUtility.NormalizeResourcesKey(config.PrefabKey);
+                message +=
+                    $" 如果使用 ResourcesLoader，请确认文件位于 Assets/Resources/{normalizedKey}.prefab，且 PrefabKey 不包含 Assets/Resources/ 和 .prefab。";
+            }
+
+            return message;
         }
     }
 }
