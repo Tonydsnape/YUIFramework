@@ -12,8 +12,10 @@ namespace YUIFramework
         private Text _messageText;
         private Button _closeButton;
         private Button _nextButton;
+        private Button _publishButton;
         private UnityAction _closeAction;
         private UnityAction _nextAction;
+        private UnityAction _publishAction;
 
         protected override void HandleInit()
         {
@@ -80,9 +82,36 @@ namespace YUIFramework
             nextLabel.text = "Next";
 
             _closeAction = async () => await UIManager.Instance.CloseAsync(this);
-            _nextAction = async () => await UIManager.Instance.Navigator.PushAsync<SecondSamplePage>("Welcome to SecondSamplePage");
+            _nextAction = async () =>
+            {
+                await UIManager.Instance.Navigator.PushAsync<SecondSamplePage>("Welcome to SecondSamplePage");
+                PublishMessage("sample.hello", "Hello from SampleHelloPage");
+            };
+            _publishAction = () => PublishMessage("sample.hello", "Hello from SampleHelloPage");
             _closeButton.onClick.AddListener(_closeAction);
             _nextButton.onClick.AddListener(_nextAction);
+
+            var publishRect = CreateUIObject("PublishMessageButton", panel);
+            publishRect.sizeDelta = new Vector2(320f, 80f);
+            publishRect.anchorMin = new Vector2(0.5f, 0f);
+            publishRect.anchorMax = new Vector2(0.5f, 0f);
+            publishRect.pivot = new Vector2(0.5f, 0f);
+            publishRect.anchoredPosition = new Vector2(0f, 280f);
+
+            var publishImage = publishRect.gameObject.AddComponent<Image>();
+            publishImage.color = new Color(0.15f, 0.35f, 0.22f, 0.95f);
+            _publishButton = publishRect.gameObject.AddComponent<Button>();
+            _publishButton.targetGraphic = publishImage;
+            _publishButton.onClick.AddListener(_publishAction);
+
+            var publishLabelRect = CreateUIObject("Label", publishRect);
+            StretchFull(publishLabelRect);
+            var publishLabel = publishLabelRect.gameObject.AddComponent<Text>();
+            publishLabel.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            publishLabel.alignment = TextAnchor.MiddleCenter;
+            publishLabel.color = Color.white;
+            publishLabel.fontSize = 28;
+            publishLabel.text = "Publish Message";
         }
 
         protected override void HandleShow(object args)
@@ -107,6 +136,11 @@ namespace YUIFramework
             if (_nextButton != null && _nextAction != null)
             {
                 _nextButton.onClick.RemoveListener(_nextAction);
+            }
+
+            if (_publishButton != null && _publishAction != null)
+            {
+                _publishButton.onClick.RemoveListener(_publishAction);
             }
         }
 

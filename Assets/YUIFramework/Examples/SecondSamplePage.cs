@@ -15,6 +15,8 @@ namespace YUIFramework
 
         protected override void HandleInit()
         {
+            SubscribeMessage<string>("sample.hello", OnSampleHelloMessage);
+
             var root = View.RectTransform;
             root.anchorMin = Vector2.zero;
             root.anchorMax = Vector2.one;
@@ -68,6 +70,11 @@ namespace YUIFramework
             }
 
             _messageText.text = message;
+        }
+
+        private void OnSampleHelloMessage(string message)
+        {
+            Debug.Log($"[SecondSamplePage] Received sample.hello: {message}");
         }
 
         protected override void HandleDestroy()

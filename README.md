@@ -1,6 +1,6 @@
 # YUIFramework
 
-YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架 + P2 栈式页面导航 + P3 资源加载体系增强 + P4 UI 对象池缓存增强**。
+YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架 + P2 栈式页面导航 + P3 资源加载体系增强 + P4 UI 对象池缓存增强 + P5 UI 消息中心**。
 
 设计灵感来自：
 - 原神 `MoleMole.UIManager`（Context / Layer / 配置驱动）
@@ -16,6 +16,7 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 - P2 栈式页面导航 `UINavigator`（✅）
 - P3 资源加载体系增强（✅，Resources + 可选 Addressables）
 - P4 UI 对象池 / 缓存增强（✅）
+- P5 UI 消息中心 / 事件总线（✅）
 
 核心能力：
 - 分层系统（`UILayer` + 每层独立 Canvas）
@@ -223,14 +224,47 @@ UIManager.Instance.ClearPool<MainMenuPageContext>();
 UIManager.Instance.ClearAllPools();
 ```
 
+## P5 UI 消息中心 / 事件总线
+
+框架已内置 `UIMessageCenter`，用于 Context 间或 UI 与业务系统的轻量解耦通信。
+
+基础用法：
+
+```csharp
+UIManager.Instance.MessageCenter.Subscribe<string>(
+    "player.coin.changed",
+    value => Debug.Log(value));
+
+UIManager.Instance.MessageCenter.Publish("player.coin.changed", "100");
+```
+
+Context 内推荐用法：
+
+```csharp
+protected override void HandleInit()
+{
+    SubscribeMessage<int>("player.coin.changed", OnCoinChanged);
+}
+
+private void OnCoinChanged(int value)
+{
+    // refresh UI
+}
+```
+
+生命周期建议：
+- 长生命周期监听：`HandleInit` 订阅，`OnDestroy` 自动清理。
+- 仅显示期间监听：`HandleShow` 订阅，`HandleHide` 手动 `Dispose`。
+- 入池对象不会触发 `OnDestroy`，因此入池期间订阅可能保留，请按业务选择订阅时机。
+
 ## 路线图
 
 - P1 核心骨架（✅）
 - P2 栈式导航 `UINavigator`（✅）
 - P3 资源加载体系增强（✅，Resources + 可选 Addressables）
 - P4 对象池 / UI 缓存增强（✅）
-- P5 消息中心（⏳）
-- P6 虚拟列表
+- P5 消息中心（✅）
+- P6 虚拟列表 / 大量 UI 元素优化（⏳）
 - P7 转场动画
 - P8 MVVM / 数据绑定
 - P9 Editor 工具
@@ -238,4 +272,4 @@ UIManager.Instance.ClearAllPools();
 
 ---
 
-当前仓库已落地 P1 + P2 + P3 + P4，P5 及后续模块待实现。
+当前仓库已落地 P1 + P2 + P3 + P4 + P5，P6 及后续模块待实现。

@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace YUIFramework
@@ -8,6 +10,7 @@ namespace YUIFramework
     public abstract class BaseContext : IUIContext
     {
         private bool _initialized;
+        private readonly List<UIMessageToken> _messageTokens = new List<UIMessageToken>();
 
         public string Id { get; internal set; }
         public UILayer Layer { get; internal set; }
@@ -57,6 +60,7 @@ namespace YUIFramework
         public void OnDestroy()
         {
             State = UIContextState.Destroyed;
+            UnsubscribeAllMessages();
             HandleDestroy();
         }
 
@@ -78,6 +82,51 @@ namespace YUIFramework
 
         protected virtual void HandleDestroy()
         {
+        }
+
+        protected UIMessageToken SubscribeMessage(string messageName, Action handler)
+        {
+            var token = UIManager.Instance.MessageCenter.Subscribe(messageName, handler, this);
+            TrackMessageToken(token);
+            return token;
+        }
+
+        protected UIMessageToken SubscribeMessage<T>(string messageName, Action<T> handler)
+        {
+            var token = UIManager.Instance.MessageCenter.Subscribe(messageName, handler, this);
+            TrackMessageToken(token);
+            return token;
+        }
+
+        protected void PublishMessage(string messageName)
+        {
+            UIManager.Instance.MessageCenter.Publish(messageName);
+        }
+
+        protected void PublishMessage<T>(string messageName, T payload)
+        {
+            UIManager.Instance.MessageCenter.Publish(messageName, payload);
+        }
+
+        protected void TrackMessageToken(UIMessageToken token)
+        {
+            if (token == null || token.IsDisposed)
+            {
+                return;
+            }
+
+            _messageTokens.Add(token);
+        }
+
+        protected void UnsubscribeAllMessages()
+        {
+            for (var i = _messageTokens.Count - 1; i >= 0; i--)
+            {
+                _messageTokens[i].Dispose();
+            }
+
+            _messageTokens.Clear();
+            UIManager.Instance.MessageCenter.UnsubscribeOwner(this);
         }
     }
 }

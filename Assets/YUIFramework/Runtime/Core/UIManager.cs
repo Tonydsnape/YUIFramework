@@ -23,10 +23,16 @@ namespace YUIFramework
 
         public static UIManager Instance => LazyInstance.Value;
         public UINavigator Navigator { get; private set; }
+        public UIMessageCenter MessageCenter { get; private set; }
+
+        private UIManager()
+        {
+        }
 
         public void Init(IResourceLoader loader, IUIObjectPool pool = null)
         {
             _resourceLoader = loader ?? throw new ArgumentNullException(nameof(loader));
+            MessageCenter ??= new UIMessageCenter();
             if (pool != null)
             {
                 if (_objectPool != null && !ReferenceEquals(_objectPool, pool))
@@ -149,7 +155,6 @@ namespace YUIFramework
             _contextPrefabKeys[newContext] = config.PrefabKey;
 
             // TODO(P2): 接入栈式导航（Push/Pop/Replace）并结合 FullScreen 决策遮挡策略。
-            // TODO(P5): 接入消息中心，支持 UI 与系统模块解耦通信。
             return newContext;
         }
 
