@@ -18,7 +18,8 @@ namespace YUIFramework
                 Id = "HelloPage",
                 PrefabKey = "SampleHelloPage",
                 Layer = UILayer.Normal,
-                CacheOnClose = false,
+                CacheOnClose = true,
+                MaxPoolSize = 1,
                 FullScreen = true,
             });
             uiManager.Register<SecondSamplePage>(new UIConfig

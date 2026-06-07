@@ -17,15 +17,30 @@ namespace YUIFramework
         private readonly Dictionary<BaseContext, string> _contextPrefabKeys = new Dictionary<BaseContext, string>();
 
         private IResourceLoader _resourceLoader;
+        private IUIObjectPool _objectPool = new UIObjectPool();
         private UILayerManager _layerManager;
         private bool _initialized;
 
         public static UIManager Instance => LazyInstance.Value;
         public UINavigator Navigator { get; private set; }
 
-        public void Init(IResourceLoader loader)
+        public void Init(IResourceLoader loader, IUIObjectPool pool = null)
         {
             _resourceLoader = loader ?? throw new ArgumentNullException(nameof(loader));
+            if (pool != null)
+            {
+                if (_objectPool != null && !ReferenceEquals(_objectPool, pool))
+                {
+                    _objectPool.Clear(DestroyPooledObject);
+                }
+
+                _objectPool = pool;
+            }
+            else
+            {
+                _objectPool ??= new UIObjectPool();
+            }
+
             _layerManager = new UILayerManager(UIRoot.Instance);
             Navigator ??= new UINavigator(this);
             _initialized = true;
@@ -76,6 +91,25 @@ namespace YUIFramework
                 return (T)cachedContext;
             }
 
+            if (_objectPool.TryGet(contextType, out var pooled))
+            {
+                var pooledContext = pooled.Context;
+                var pooledViewObject = pooled.ViewObject;
+                if (pooledContext != null && pooledViewObject != null)
+                {
+                    var pooledView = pooledContext.View ?? pooledViewObject.GetComponent<UIView>() ?? pooledViewObject.AddComponent<UIView>();
+                    pooledContext.BindRuntime(config.Id, config.Layer, pooledView, pooledViewObject);
+                    pooledView.Context = pooledContext;
+                    _layerManager.AddToLayer(config.Layer, pooledView.RectTransform);
+                    pooledViewObject.SetActive(true);
+                    pooledContext.OnShow(args);
+
+                    _activeContexts[contextType] = pooledContext;
+                    _contextPrefabKeys[pooledContext] = pooled.PrefabKey;
+                    return (T)pooledContext;
+                }
+            }
+
             var newContext = Activator.CreateInstance<T>();
             newContext.State = UIContextState.Loading;
 
@@ -118,7 +152,6 @@ namespace YUIFramework
             _contextPrefabKeys[newContext] = config.PrefabKey;
 
             // TODO(P2): 接入栈式导航（Push/Pop/Replace）并结合 FullScreen 决策遮挡策略。
-            // TODO(P4): 接入对象池与更细粒度缓存策略，减少频繁 Instantiate/Destroy 开销。
             // TODO(P5): 接入消息中心，支持 UI 与系统模块解耦通信。
             return newContext;
         }
@@ -147,28 +180,28 @@ namespace YUIFramework
 
             ctx.OnHide();
             ctx.OnClose();
+            _activeContexts.Remove(contextType);
 
-            if (_configRegistry.TryGetValue(contextType, out var config) && config.CacheOnClose)
+            _configRegistry.TryGetValue(contextType, out var config);
+            var prefabKey = ResolvePrefabKey(ctx, config);
+
+            if (config != null && _objectPool != null)
             {
-                if (ctx.ViewObject != null)
+                var policy = UIPoolPolicy.FromConfig(config);
+                var pooledObject = new UIPooledObject(contextType, prefabKey, ctx, ctx.ViewObject);
+                if (_objectPool.TryRelease(contextType, pooledObject, policy, out var overflow))
                 {
-                    ctx.ViewObject.SetActive(false);
+                    return Task.CompletedTask;
                 }
 
-                return Task.CompletedTask;
+                if (overflow != null)
+                {
+                    DestroyContextInternal(overflow.Context, overflow.PrefabKey);
+                    return Task.CompletedTask;
+                }
             }
 
-            _activeContexts.Remove(contextType);
-            ctx.OnDestroy();
-
-            if (ctx.ViewObject != null)
-            {
-                var prefabKey = _contextPrefabKeys.TryGetValue(ctx, out var storedKey)
-                    ? storedKey
-                    : config != null ? config.PrefabKey : string.Empty;
-                _resourceLoader.Release(prefabKey, ctx.ViewObject);
-            }
-            _contextPrefabKeys.Remove(ctx);
+            DestroyContextInternal(ctx, prefabKey);
 
             return Task.CompletedTask;
         }
@@ -186,6 +219,18 @@ namespace YUIFramework
             }
 
             return context.ViewObject.activeInHierarchy;
+        }
+
+        public void ClearPool<T>() where T : BaseContext
+        {
+            EnsureInitialized();
+            _objectPool?.Clear(typeof(T), DestroyPooledObject);
+        }
+
+        public void ClearAllPools()
+        {
+            EnsureInitialized();
+            _objectPool?.Clear(DestroyPooledObject);
         }
 
         internal void HideWithoutClose(BaseContext ctx)
@@ -231,6 +276,42 @@ namespace YUIFramework
             {
                 throw new InvalidOperationException("UIManager 尚未初始化。请先调用 Init(IResourceLoader)。");
             }
+        }
+
+        private string ResolvePrefabKey(BaseContext context, UIConfig config)
+        {
+            if (context != null && _contextPrefabKeys.TryGetValue(context, out var storedKey))
+            {
+                return storedKey;
+            }
+
+            return config?.PrefabKey ?? string.Empty;
+        }
+
+        private void DestroyPooledObject(UIPooledObject pooledObject)
+        {
+            if (pooledObject == null)
+            {
+                return;
+            }
+
+            DestroyContextInternal(pooledObject.Context, pooledObject.PrefabKey);
+        }
+
+        private void DestroyContextInternal(BaseContext context, string prefabKey)
+        {
+            if (context == null)
+            {
+                return;
+            }
+
+            context.OnDestroy();
+            if (context.ViewObject != null)
+            {
+                _resourceLoader.Release(prefabKey, context.ViewObject);
+            }
+
+            _contextPrefabKeys.Remove(context);
         }
 
         private static string BuildPrefabLoadErrorMessage(Type contextType, UIConfig config, string loaderType, string detail)
