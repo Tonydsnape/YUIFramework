@@ -30,6 +30,15 @@ namespace YUIFramework
                 CacheOnClose = false,
                 FullScreen = true,
             });
+            uiManager.Register<VirtualListSamplePage>(new UIConfig
+            {
+                Id = "VirtualListSamplePage",
+                PrefabKey = "VirtualListSamplePage",
+                Layer = UILayer.Normal,
+                CacheOnClose = true,
+                MaxPoolSize = 1,
+                FullScreen = true,
+            });
 
             await uiManager.Navigator.PushAsync<SampleHelloPage>("Hello YUIFramework!");
         }

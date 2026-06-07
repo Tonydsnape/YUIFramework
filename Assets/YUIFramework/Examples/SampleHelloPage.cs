@@ -12,9 +12,11 @@ namespace YUIFramework
         private Text _messageText;
         private Button _closeButton;
         private Button _nextButton;
+        private Button _virtualListButton;
         private Button _publishButton;
         private UnityAction _closeAction;
         private UnityAction _nextAction;
+        private UnityAction _virtualListAction;
         private UnityAction _publishAction;
 
         protected override void HandleInit()
@@ -91,6 +93,30 @@ namespace YUIFramework
             _closeButton.onClick.AddListener(_closeAction);
             _nextButton.onClick.AddListener(_nextAction);
 
+            var virtualListRect = CreateUIObject("VirtualListButton", panel);
+            virtualListRect.sizeDelta = new Vector2(360f, 80f);
+            virtualListRect.anchorMin = new Vector2(0.5f, 0f);
+            virtualListRect.anchorMax = new Vector2(0.5f, 0f);
+            virtualListRect.pivot = new Vector2(0.5f, 0f);
+            virtualListRect.anchoredPosition = new Vector2(0f, 380f);
+
+            var virtualListImage = virtualListRect.gameObject.AddComponent<Image>();
+            virtualListImage.color = new Color(0.2f, 0.22f, 0.35f, 0.95f);
+            _virtualListButton = virtualListRect.gameObject.AddComponent<Button>();
+            _virtualListButton.targetGraphic = virtualListImage;
+
+            var virtualListLabelRect = CreateUIObject("Label", virtualListRect);
+            StretchFull(virtualListLabelRect);
+            var virtualListLabel = virtualListLabelRect.gameObject.AddComponent<Text>();
+            virtualListLabel.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            virtualListLabel.alignment = TextAnchor.MiddleCenter;
+            virtualListLabel.color = Color.white;
+            virtualListLabel.fontSize = 26;
+            virtualListLabel.text = "Open Virtual List";
+
+            _virtualListAction = async () => await UIManager.Instance.Navigator.PushAsync<VirtualListSamplePage>();
+            _virtualListButton.onClick.AddListener(_virtualListAction);
+
             var publishRect = CreateUIObject("PublishMessageButton", panel);
             publishRect.sizeDelta = new Vector2(320f, 80f);
             publishRect.anchorMin = new Vector2(0.5f, 0f);
@@ -136,6 +162,11 @@ namespace YUIFramework
             if (_nextButton != null && _nextAction != null)
             {
                 _nextButton.onClick.RemoveListener(_nextAction);
+            }
+
+            if (_virtualListButton != null && _virtualListAction != null)
+            {
+                _virtualListButton.onClick.RemoveListener(_virtualListAction);
             }
 
             if (_publishButton != null && _publishAction != null)

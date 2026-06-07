@@ -1,6 +1,6 @@
 # YUIFramework
 
-YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架 + P2 栈式页面导航 + P3 资源加载体系增强 + P4 UI 对象池缓存增强 + P5 UI 消息中心**。
+YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架 + P2 栈式页面导航 + P3 资源加载体系增强 + P4 UI 对象池缓存增强 + P5 UI 消息中心 + P6 轻量虚拟列表**。
 
 设计灵感来自：
 - 原神 `MoleMole.UIManager`（Context / Layer / 配置驱动）
@@ -17,6 +17,7 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 - P3 资源加载体系增强（✅，Resources + 可选 Addressables）
 - P4 UI 对象池 / 缓存增强（✅）
 - P5 UI 消息中心 / 事件总线（✅）
+- P6 虚拟列表 / 大量 UI 元素优化（✅）
 
 核心能力：
 - 分层系统（`UILayer` + 每层独立 Canvas）
@@ -26,6 +27,7 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 - 核心调度器（`UIManager`）
 - Page 栈导航（`Push / Pop / Replace / Back`）
 - UI 缓存池（`CacheOnClose` + `MaxPoolSize`）
+- 轻量虚拟列表（`UIVirtualList`，固定尺寸 item 复用）
 - 纯代码示例（无需提交 prefab / scene 二进制资源）
 
 ## 架构总览
@@ -257,6 +259,37 @@ private void OnCoinChanged(int value)
 - 仅显示期间监听：`HandleShow` 订阅，`HandleHide` 手动 `Dispose`。
 - 入池对象不会触发 `OnDestroy`，因此入池期间订阅可能保留，请按业务选择订阅时机。
 
+## P6 虚拟列表 / 大量 UI 元素优化
+
+P6 新增 `Runtime/VirtualList`，用于背包、邮件、排行榜、任务列表等大数据量 UI 场景，避免一次性创建大量 Item。
+
+基础用法：
+
+```csharp
+public sealed class MailPage : BasePageContext, IUIVirtualListDataSource
+{
+    private UIVirtualList _list;
+
+    protected override void HandleInit()
+    {
+        _list.SetDataSource(this);
+        _list.ReloadData();
+    }
+
+    public int Count => 1000;
+
+    public void BindItem(UIVirtualListItem item, int index)
+    {
+        // bind item
+    }
+}
+```
+
+当前限制：
+- P6 仅支持固定 Item 尺寸。
+- 垂直列表优先（水平为基础预留）。
+- Grid / 不等高 / 循环列表为后续扩展。
+
 ## 路线图
 
 - P1 核心骨架（✅）
@@ -264,8 +297,8 @@ private void OnCoinChanged(int value)
 - P3 资源加载体系增强（✅，Resources + 可选 Addressables）
 - P4 对象池 / UI 缓存增强（✅）
 - P5 消息中心（✅）
-- P6 虚拟列表 / 大量 UI 元素优化（⏳）
-- P7 转场动画
+- P6 虚拟列表 / 大量 UI 元素优化（✅）
+- P7 转场动画（⏳）
 - P8 MVVM / 数据绑定
 - P9 Editor 工具
 - P10 示例与测试完善
