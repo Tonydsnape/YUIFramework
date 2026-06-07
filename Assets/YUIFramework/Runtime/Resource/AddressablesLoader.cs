@@ -43,6 +43,17 @@ namespace YUIFramework
                 }
                 catch (Exception ex)
                 {
+                    tracked.RefCount--;
+                    if (tracked.RefCount <= 0)
+                    {
+                        if (tracked.Handle.IsValid())
+                        {
+                            Addressables.Release(tracked.Handle);
+                        }
+
+                        _handles.Remove(key);
+                    }
+
                     throw new ResourceLoadException(key, loaderType, "Addressables 加载过程中发生异常。", ex);
                 }
 
@@ -57,7 +68,13 @@ namespace YUIFramework
                     _handles.Remove(key);
                 }
 
-                throw new ResourceLoadException(key, loaderType, "Addressables 返回失败状态，未获取到有效 Prefab。");
+                var statusMessage = tracked.Handle.OperationException != null
+                    ? tracked.Handle.OperationException.Message
+                    : "无额外错误信息";
+                throw new ResourceLoadException(
+                    key,
+                    loaderType,
+                    $"Addressables 返回失败状态：status={tracked.Handle.Status}，error={statusMessage}");
             }
 
             var handle = Addressables.LoadAssetAsync<GameObject>(key);
@@ -73,7 +90,13 @@ namespace YUIFramework
                 await handle.Task;
                 if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
                 {
-                    throw new ResourceLoadException(key, loaderType, "Addressables 返回失败状态，未获取到有效 Prefab。");
+                    var statusMessage = handle.OperationException != null
+                        ? handle.OperationException.Message
+                        : "无额外错误信息";
+                    throw new ResourceLoadException(
+                        key,
+                        loaderType,
+                        $"Addressables 返回失败状态：status={handle.Status}，error={statusMessage}");
                 }
 
                 return handle.Result;

@@ -88,7 +88,7 @@ namespace YUIFramework
             catch (ResourceLoadException ex)
             {
                 throw new InvalidOperationException(
-                    BuildPrefabLoadErrorMessage(contextType, config, ex.LoaderType, ex.Message), ex);
+                    BuildPrefabLoadErrorMessage(contextType, config, ex.LoaderType, ex.DetailMessage), ex);
             }
             catch (Exception ex)
             {

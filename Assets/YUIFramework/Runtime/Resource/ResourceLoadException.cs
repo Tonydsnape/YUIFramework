@@ -9,12 +9,14 @@ namespace YUIFramework
     {
         public string Key { get; }
         public string LoaderType { get; }
+        public string DetailMessage { get; }
 
         public ResourceLoadException(string key, string loaderType, string message)
             : base(BuildMessage(key, loaderType, message))
         {
             Key = key;
             LoaderType = loaderType;
+            DetailMessage = message;
         }
 
         public ResourceLoadException(string key, string loaderType, string message, Exception innerException)
@@ -22,6 +24,7 @@ namespace YUIFramework
         {
             Key = key;
             LoaderType = loaderType;
+            DetailMessage = message;
         }
 
         private static string BuildMessage(string key, string loaderType, string message)
