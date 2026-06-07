@@ -150,10 +150,21 @@ namespace YUIFramework
                 return reopened;
             }
 
-            for (var i = _pageStack.Count - 1; i > existingIndex; i--)
+            var closedCount = 0;
+            try
             {
-                await _uiManager.CloseAsync(_pageStack[i].Page);
-                _pageStack.RemoveAt(i);
+                for (var i = _pageStack.Count - 1; i > existingIndex; i--)
+                {
+                    await _uiManager.CloseAsync(_pageStack[i].Page);
+                    closedCount++;
+                }
+            }
+            finally
+            {
+                if (closedCount > 0)
+                {
+                    _pageStack.RemoveRange(_pageStack.Count - closedCount, closedCount);
+                }
             }
 
             var existingPage = (T)_pageStack[existingIndex].Page;

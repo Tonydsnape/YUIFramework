@@ -7,7 +7,7 @@ namespace YUIFramework
     /// </summary>
     public class HelloUIBootstrap : MonoBehaviour
     {
-        private bool _isBackHandling;
+        private bool _isHandlingBackNavigation;
 
         private async void Start()
         {
@@ -35,19 +35,19 @@ namespace YUIFramework
 
         private async void Update()
         {
-            if (_isBackHandling || !Input.GetKeyDown(KeyCode.Escape))
+            if (_isHandlingBackNavigation || !Input.GetKeyDown(KeyCode.Escape))
             {
                 return;
             }
 
-            _isBackHandling = true;
+            _isHandlingBackNavigation = true;
             try
             {
                 await UIManager.Instance.Navigator.BackAsync();
             }
             finally
             {
-                _isBackHandling = false;
+                _isHandlingBackNavigation = false;
             }
         }
     }
