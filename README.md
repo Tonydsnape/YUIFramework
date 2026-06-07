@@ -1,6 +1,6 @@
 # YUIFramework
 
-YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架 + P2 栈式页面导航 + P3 资源加载体系增强 + P4 UI 对象池缓存增强 + P5 UI 消息中心 + P6 轻量虚拟列表**。
+YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架 + P2 栈式页面导航 + P3 资源加载体系增强 + P4 UI 对象池缓存增强 + P5 UI 消息中心 + P6 轻量虚拟列表 + P7 轻量转场动画**。
 
 设计灵感来自：
 - 原神 `MoleMole.UIManager`（Context / Layer / 配置驱动）
@@ -18,6 +18,7 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 - P4 UI 对象池 / 缓存增强（✅）
 - P5 UI 消息中心 / 事件总线（✅）
 - P6 虚拟列表 / 大量 UI 元素优化（✅）
+- P7 UI 转场动画 / 页面过渡系统（✅）
 
 核心能力：
 - 分层系统（`UILayer` + 每层独立 Canvas）
@@ -28,6 +29,7 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 - Page 栈导航（`Push / Pop / Replace / Back`）
 - UI 缓存池（`CacheOnClose` + `MaxPoolSize`）
 - 轻量虚拟列表（`UIVirtualList`，固定尺寸 item 复用）
+- 轻量转场动画（Fade / Scale / Slide）
 - 纯代码示例（无需提交 prefab / scene 二进制资源）
 
 ## 架构总览
@@ -82,10 +84,12 @@ OnInit -> OnShow -> OnHide -> OnClose -> OnDestroy
 - `OnClose`：关闭流程中的业务收尾阶段。
 - `OnDestroy`：对象释放前触发；缓存关闭策略下可能暂不触发。
 
-P4 生命周期语义：
+P7 生命周期语义：
 - 首次创建：`OnInit -> OnShow`
-- 关闭入池：`OnHide -> OnClose -> SetActive(false)`
-- 池中取回：`SetActive(true) -> OnShow`（不会重复 `OnInit`）
+- 打开（启用转场）：`OnInit（首次） -> SetActive(true) -> OnShow(args) -> ShowTransition`
+- 关闭：`HideTransition -> OnHide -> OnClose -> Pool/Destroy`
+- 关闭入池：`HideTransition -> OnHide -> OnClose -> SetActive(false)`
+- 池中取回：`SetActive(true) -> OnShow -> ShowTransition`（不会重复 `OnInit`）
 - 池满/不缓存：`OnDestroy -> Release`
 
 ## 快速开始
@@ -290,6 +294,36 @@ public sealed class MailPage : BasePageContext, IUIVirtualListDataSource
 - 垂直列表优先（水平为基础预留）。
 - Grid / 不等高 / 循环列表为后续扩展。
 
+## P7 UI 转场动画 / 页面过渡系统
+
+P7 新增 `Runtime/Transitions`，默认不开启。单个页面可在 `UIConfig` 中配置：
+
+```csharp
+uiManager.Register<MainMenuPageContext>(new UIConfig
+{
+    Id = "MainMenuPage",
+    PrefabKey = "UI/Pages/MainMenuPage",
+    Layer = UILayer.Normal,
+    CacheOnClose = true,
+    FullScreen = true,
+    UseTransition = true,
+    TransitionType = UITransitionType.Fade,
+    ShowDuration = 0.25f,
+    HideDuration = 0.15f,
+});
+```
+
+支持类型：
+- `None`
+- `Fade`
+- `Scale`
+- `SlideLeft / SlideRight / SlideUp / SlideDown`
+
+说明：
+- Navigator 的 `Push/Pop/Replace/Back` 通过 `UIManager.OpenAsync/CloseAsync` 自动触发转场。
+- `HideWithoutClose`（栈下页面临时隐藏）保持原行为，不播放 close transition。
+- 对象池复用时：出池播放 Show，入池前播放 Hide。
+
 ## 路线图
 
 - P1 核心骨架（✅）
@@ -298,11 +332,11 @@ public sealed class MailPage : BasePageContext, IUIVirtualListDataSource
 - P4 对象池 / UI 缓存增强（✅）
 - P5 消息中心（✅）
 - P6 虚拟列表 / 大量 UI 元素优化（✅）
-- P7 转场动画（⏳）
+- P7 转场动画（✅）
 - P8 MVVM / 数据绑定
 - P9 Editor 工具
 - P10 示例与测试完善
 
 ---
 
-当前仓库已落地 P1 + P2 + P3 + P4 + P5，P6 及后续模块待实现。
+当前仓库已落地 P1 + P2 + P3 + P4 + P5 + P6 + P7，P8 及后续模块待实现。

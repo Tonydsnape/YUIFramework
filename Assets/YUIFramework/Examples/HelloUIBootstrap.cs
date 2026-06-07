@@ -21,6 +21,10 @@ namespace YUIFramework
                 CacheOnClose = true,
                 MaxPoolSize = 1,
                 FullScreen = true,
+                UseTransition = true,
+                TransitionType = UITransitionType.Fade,
+                ShowDuration = 0.2f,
+                HideDuration = 0.15f,
             });
             uiManager.Register<SecondSamplePage>(new UIConfig
             {
@@ -29,6 +33,11 @@ namespace YUIFramework
                 Layer = UILayer.Normal,
                 CacheOnClose = false,
                 FullScreen = true,
+                UseTransition = true,
+                TransitionType = UITransitionType.SlideLeft,
+                ShowDuration = 0.25f,
+                HideDuration = 0.2f,
+                SlideDistance = 900f,
             });
             uiManager.Register<VirtualListSamplePage>(new UIConfig
             {
@@ -38,6 +47,11 @@ namespace YUIFramework
                 CacheOnClose = true,
                 MaxPoolSize = 1,
                 FullScreen = true,
+                UseTransition = true,
+                TransitionType = UITransitionType.Scale,
+                ShowDuration = 0.2f,
+                HideDuration = 0.15f,
+                StartScale = 0.92f,
             });
 
             await uiManager.Navigator.PushAsync<SampleHelloPage>("Hello YUIFramework!");
