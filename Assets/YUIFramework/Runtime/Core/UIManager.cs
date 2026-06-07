@@ -19,11 +19,13 @@ namespace YUIFramework
         private IResourceLoader _resourceLoader;
         private IUIObjectPool _objectPool = new UIObjectPool();
         private UILayerManager _layerManager;
+        private UITransitionRunner _transitionRunner;
         private bool _initialized;
 
         public static UIManager Instance => LazyInstance.Value;
         public UINavigator Navigator { get; private set; }
         public UIMessageCenter MessageCenter { get; private set; }
+        public UITransitionRunner TransitionRunner => _transitionRunner;
 
         private UIManager()
         {
@@ -49,6 +51,7 @@ namespace YUIFramework
 
             _layerManager = new UILayerManager(UIRoot.Instance);
             Navigator ??= new UINavigator(this);
+            _transitionRunner ??= new UITransitionRunner();
             _initialized = true;
         }
 
@@ -94,6 +97,7 @@ namespace YUIFramework
                 _layerManager.AddToLayer(cachedContext.Layer, cachedContext.View.RectTransform);
                 cachedContext.ViewObject.SetActive(true);
                 cachedContext.OnShow(args);
+                await PlayShowTransitionAsync(cachedContext, config);
                 return (T)cachedContext;
             }
 
@@ -107,6 +111,7 @@ namespace YUIFramework
                 _layerManager.AddToLayer(config.Layer, pooledView.RectTransform);
                 pooledViewObject.SetActive(true);
                 pooledContext.OnShow(args);
+                await PlayShowTransitionAsync(pooledContext, config);
 
                 _activeContexts[contextType] = pooledContext;
                 _contextPrefabKeys[pooledContext] = pooled.PrefabKey;
@@ -150,6 +155,7 @@ namespace YUIFramework
             newContext.OnInit();
             instance.SetActive(true);
             newContext.OnShow(args);
+            await PlayShowTransitionAsync(newContext, config);
 
             _activeContexts[contextType] = newContext;
             _contextPrefabKeys[newContext] = config.PrefabKey;
@@ -165,26 +171,27 @@ namespace YUIFramework
                 : Task.CompletedTask;
         }
 
-        public Task CloseAsync(BaseContext ctx)
+        public async Task CloseAsync(BaseContext ctx)
         {
             EnsureInitialized();
 
             if (ctx == null)
             {
-                return Task.CompletedTask;
+                return;
             }
 
             var contextType = ctx.GetType();
             if (!_activeContexts.ContainsKey(contextType))
             {
-                return Task.CompletedTask;
+                return;
             }
 
+            _configRegistry.TryGetValue(contextType, out var config);
+            await PlayHideTransitionAsync(ctx, config);
             ctx.OnHide();
             ctx.OnClose();
             _activeContexts.Remove(contextType);
 
-            _configRegistry.TryGetValue(contextType, out var config);
             var prefabKey = ResolvePrefabKey(ctx, config);
 
             if (config != null && _objectPool != null)
@@ -193,19 +200,17 @@ namespace YUIFramework
                 var pooledObject = new UIPooledObject(contextType, prefabKey, ctx, ctx.ViewObject);
                 if (_objectPool.TryRelease(contextType, pooledObject, policy, out var overflow))
                 {
-                    return Task.CompletedTask;
+                    return;
                 }
 
                 if (overflow != null)
                 {
                     DestroyContextInternal(overflow.Context, overflow.PrefabKey);
-                    return Task.CompletedTask;
+                    return;
                 }
             }
 
             DestroyContextInternal(ctx, prefabKey);
-
-            return Task.CompletedTask;
         }
 
         public T Get<T>() where T : BaseContext
@@ -334,6 +339,31 @@ namespace YUIFramework
             }
 
             return message;
+        }
+
+        private async Task PlayShowTransitionAsync(BaseContext context, UIConfig config)
+        {
+            if (context?.View?.RectTransform == null || !IsTransitionEnabled(config))
+            {
+                return;
+            }
+
+            await _transitionRunner.PlayShowAsync(context.View.RectTransform, config.ToTransitionOptions());
+        }
+
+        private async Task PlayHideTransitionAsync(BaseContext context, UIConfig config)
+        {
+            if (context?.View?.RectTransform == null || !IsTransitionEnabled(config))
+            {
+                return;
+            }
+
+            await _transitionRunner.PlayHideAsync(context.View.RectTransform, config.ToTransitionOptions());
+        }
+
+        private static bool IsTransitionEnabled(UIConfig config)
+        {
+            return config != null && config.UseTransition && config.TransitionType != UITransitionType.None;
         }
     }
 }

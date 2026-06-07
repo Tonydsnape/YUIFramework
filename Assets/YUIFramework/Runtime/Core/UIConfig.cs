@@ -36,5 +36,58 @@ namespace YUIFramework
         /// 是否全屏（后续导航栈遮挡策略使用）。
         /// </summary>
         public bool FullScreen;
+
+        /// <summary>
+        /// 是否启用 UI 转场动画。默认关闭以保持兼容。
+        /// </summary>
+        public bool UseTransition;
+
+        /// <summary>
+        /// 转场类型（Fade / Scale / Slide 等）。
+        /// </summary>
+        public UITransitionType TransitionType = UITransitionType.None;
+
+        /// <summary>
+        /// 打开动画时长（秒）。
+        /// </summary>
+        public float ShowDuration = 0.2f;
+
+        /// <summary>
+        /// 关闭动画时长（秒）。
+        /// </summary>
+        public float HideDuration = 0.15f;
+
+        /// <summary>
+        /// 是否忽略 Time.timeScale，默认 true。
+        /// </summary>
+        public bool IgnoreTransitionTimeScale = true;
+
+        /// <summary>
+        /// Slide 位移距离。
+        /// </summary>
+        public float SlideDistance = 800f;
+
+        /// <summary>
+        /// Scale 起始缩放（> 0）。
+        /// </summary>
+        public float StartScale = 0.9f;
+
+        /// <summary>
+        /// 转换为运行时转场配置。
+        /// </summary>
+        public UITransitionOptions ToTransitionOptions()
+        {
+            var options = new UITransitionOptions
+            {
+                Type = TransitionType,
+                ShowDuration = ShowDuration,
+                HideDuration = HideDuration,
+                IgnoreTimeScale = IgnoreTransitionTimeScale,
+                SlideDistance = SlideDistance,
+                StartScale = StartScale
+            };
+            options.Normalize();
+            return options;
+        }
     }
 }
