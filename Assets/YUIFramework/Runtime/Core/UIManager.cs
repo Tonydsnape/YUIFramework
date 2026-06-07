@@ -95,19 +95,16 @@ namespace YUIFramework
             {
                 var pooledContext = pooled.Context;
                 var pooledViewObject = pooled.ViewObject;
-                if (pooledContext != null && pooledViewObject != null)
-                {
-                    var pooledView = pooledContext.View ?? pooledViewObject.GetComponent<UIView>() ?? pooledViewObject.AddComponent<UIView>();
-                    pooledContext.BindRuntime(config.Id, config.Layer, pooledView, pooledViewObject);
-                    pooledView.Context = pooledContext;
-                    _layerManager.AddToLayer(config.Layer, pooledView.RectTransform);
-                    pooledViewObject.SetActive(true);
-                    pooledContext.OnShow(args);
+                var pooledView = ResolveOrCreateView(pooledContext, pooledViewObject);
+                pooledContext.BindRuntime(config.Id, config.Layer, pooledView, pooledViewObject);
+                pooledView.Context = pooledContext;
+                _layerManager.AddToLayer(config.Layer, pooledView.RectTransform);
+                pooledViewObject.SetActive(true);
+                pooledContext.OnShow(args);
 
-                    _activeContexts[contextType] = pooledContext;
-                    _contextPrefabKeys[pooledContext] = pooled.PrefabKey;
-                    return (T)pooledContext;
-                }
+                _activeContexts[contextType] = pooledContext;
+                _contextPrefabKeys[pooledContext] = pooled.PrefabKey;
+                return (T)pooledContext;
             }
 
             var newContext = Activator.CreateInstance<T>();
@@ -286,6 +283,11 @@ namespace YUIFramework
             }
 
             return config?.PrefabKey ?? string.Empty;
+        }
+
+        private static UIView ResolveOrCreateView(BaseContext context, GameObject viewObject)
+        {
+            return context.View ?? viewObject.GetComponent<UIView>() ?? viewObject.AddComponent<UIView>();
         }
 
         private void DestroyPooledObject(UIPooledObject pooledObject)
