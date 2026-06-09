@@ -101,6 +101,99 @@ public class HelloUIBootstrap : MonoBehaviour
 }
 ```
 
+## Unity 场景接入建议
+
+### Boot 场景推荐
+
+```text
+Boot.unity
+├── _App
+│   └── GameBootstrap
+└── Main Camera
+```
+
+- `_App` 只需要挂启动脚本。
+- 建议保留 `Main Camera`。
+- 可以删除 `Directional Light`。
+- 不需要手动创建 `Canvas`、`UIRoot`、`EventSystem`，框架会自动创建并保留 `DontDestroyOnLoad`。
+
+运行后 `UIRoot` 下会自动补齐以下层级：
+
+```text
+Layer_Scene
+Layer_Bottom
+Layer_Normal
+Layer_Fixed
+Layer_Popup
+Layer_Guide
+Layer_Top
+Layer_System
+```
+
+### Prefab 规范
+
+正式项目建议将页面 Prefab 放在：
+
+```text
+Assets/Resources/UI/Pages/MainMenuPage.prefab
+```
+
+Prefab 根节点建议结构：
+
+```text
+MainMenuPage
+├── Background
+└── SafeArea
+    ├── Title
+    ├── StartButton
+    └── SettingButton
+```
+
+根节点需要：
+
+- `RectTransform`
+- `UIView`（如果没有，框架会自动补，但建议手动添加）
+
+`PrefabKey` 应写为：
+
+```csharp
+PrefabKey = "UI/Pages/MainMenuPage"
+```
+
+不要写成：
+
+```csharp
+PrefabKey = "Assets/Resources/UI/Pages/MainMenuPage.prefab"
+PrefabKey = "UI/Pages/MainMenuPage.prefab"
+```
+
+### GameBootstrap 示例（ResourcesLoader）
+
+```csharp
+using UnityEngine;
+using YUIFramework;
+
+public sealed class GameBootstrap : MonoBehaviour
+{
+    private async void Start()
+    {
+        var ui = UIManager.Instance;
+        ui.Init(new ResourcesLoader());
+
+        ui.Register<MainMenuPageContext>(new UIConfig
+        {
+            Id = "MainMenuPage",
+            PrefabKey = "UI/Pages/MainMenuPage",
+            Layer = UILayer.Normal,
+            CacheOnClose = true,
+            FullScreen = true,
+        });
+
+        await ui.OpenAsync<MainMenuPageContext>();
+    }
+}
+```
+
 ## 路线图
 
 - P1 核心骨架（本 PR，✅）

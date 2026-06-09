@@ -56,10 +56,7 @@ namespace YUIFramework
             EnsureInitialized();
 
             var contextType = typeof(T);
-            if (!_configRegistry.TryGetValue(contextType, out var config))
-            {
-                throw new KeyNotFoundException($"未注册 UI Context: {contextType.Name}");
-            }
+            var config = GetConfigOrThrow(contextType);
 
             if (_activeContexts.TryGetValue(contextType, out var cachedContext))
             {
@@ -69,6 +66,11 @@ namespace YUIFramework
                 }
 
                 _layerManager.AddToLayer(cachedContext.Layer, cachedContext.View.RectTransform);
+                if (config.FullScreen)
+                {
+                    StretchToFullScreen(cachedContext.View.RectTransform);
+                }
+
                 cachedContext.ViewObject.SetActive(true);
                 cachedContext.OnShow(args);
                 return (T)cachedContext;
@@ -80,17 +82,26 @@ namespace YUIFramework
             var prefab = await _resourceLoader.LoadPrefabAsync(config.PrefabKey);
             if (prefab == null)
             {
-                throw new InvalidOperationException($"加载 UI Prefab 失败: key={config.PrefabKey}, type={contextType.Name}");
+                throw new InvalidOperationException(
+                    $"加载 UI Prefab 失败: key={config.PrefabKey}, type={contextType.Name}。请确认 PrefabKey 使用 Resources 相对路径，例如 \"UI/Pages/MainMenuPage\"，对应文件应位于 \"Assets/Resources/UI/Pages/MainMenuPage.prefab\"。");
             }
 
             var instance = UnityEngine.Object.Instantiate(prefab);
-            var view = instance.GetComponent<UIView>() ?? instance.AddComponent<UIView>();
+            instance.name = string.IsNullOrWhiteSpace(config.Id) ? contextType.Name : config.Id;
+            instance.SetActive(false);
+
+            var view = EnsureViewRoot(instance);
 
             var layer = config.Layer;
             newContext.BindRuntime(config.Id, layer, view, instance);
-            view.Context = newContext;
+            view.Bind(newContext);
 
             _layerManager.AddToLayer(layer, view.RectTransform);
+            if (config.FullScreen)
+            {
+                StretchToFullScreen(view.RectTransform);
+            }
+
             newContext.OnInit();
             instance.SetActive(true);
             newContext.OnShow(args);
@@ -171,10 +182,50 @@ namespace YUIFramework
 
         private void EnsureInitialized()
         {
-            if (!_initialized)
+            if (!_initialized || _resourceLoader == null)
             {
                 throw new InvalidOperationException("UIManager 尚未初始化。请先调用 Init(IResourceLoader)。");
             }
+
+            _layerManager ??= new UILayerManager(UIRoot.Instance);
+        }
+
+        private UIConfig GetConfigOrThrow(Type contextType)
+        {
+            if (!_configRegistry.TryGetValue(contextType, out var config))
+            {
+                throw new KeyNotFoundException($"未注册 UI Context: {contextType.Name}。请先调用 Register<{contextType.Name}>(UIConfig)。");
+            }
+
+            return config;
+        }
+
+        private static UIView EnsureViewRoot(GameObject instance)
+        {
+            if (instance == null)
+            {
+                throw new ArgumentNullException(nameof(instance));
+            }
+
+            _ = instance.GetComponent<RectTransform>() ?? instance.AddComponent<RectTransform>();
+            return instance.GetComponent<UIView>() ?? instance.AddComponent<UIView>();
+        }
+
+        private static void StretchToFullScreen(RectTransform rect)
+        {
+            if (rect == null)
+            {
+                return;
+            }
+
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = Vector2.zero;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            rect.localScale = Vector3.one;
         }
     }
 }

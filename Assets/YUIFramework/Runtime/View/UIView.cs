@@ -9,7 +9,8 @@ namespace YUIFramework
     {
         private RectTransform _rectTransform;
 
-        public BaseContext Context { get; internal set; }
+        public BaseContext Context { get; private set; }
+        public bool IsBound => Context != null;
 
         public RectTransform RectTransform
         {
@@ -26,6 +27,11 @@ namespace YUIFramework
 
                 return _rectTransform;
             }
+        }
+
+        internal void Bind(BaseContext context)
+        {
+            Context = context;
         }
     }
 }
