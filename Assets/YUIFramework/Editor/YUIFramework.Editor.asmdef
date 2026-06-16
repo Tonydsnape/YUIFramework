@@ -1,0 +1,18 @@
+{
+  "name": "YUIFramework.Editor",
+  "rootNamespace": "YUIFramework.Editor",
+  "references": [
+    "YUIFramework.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
