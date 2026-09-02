@@ -1,34 +1,25 @@
 namespace YUIFramework
 {
     /// <summary>
-    /// UI 分层定义。
+    /// Stable ten-layer UI model. Legacy names are aliases and share the same runtime state.
     /// </summary>
     public enum UILayer
     {
         Scene = 0,
-        Bottom = 100,
-
-        /// <summary>
-        /// 普通全屏页面层，后续导航栈主要工作层。
-        /// </summary>
+        Background = 100,
         Normal = 200,
-
-        /// <summary>
-        /// 常驻 HUD / 固定挂件层。
-        /// </summary>
         Fixed = 300,
-
-        /// <summary>
-        /// 弹窗层。
-        /// </summary>
         Popup = 400,
-
         Guide = 500,
-        Top = 600,
-
-        /// <summary>
-        /// Loading / 断线重连等最高优先级系统层。
-        /// </summary>
+        Toast = 600,
+        Loading = 650,
         System = 700,
+        Debug = 800,
+
+        [System.Obsolete("Use Background. Bottom is a compatibility alias.")]
+        Bottom = Background,
+
+        [System.Obsolete("Use Toast. Top is a compatibility alias.")]
+        Top = Toast,
     }
 }
