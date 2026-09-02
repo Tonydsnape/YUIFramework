@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 
 namespace YUIFramework
@@ -10,24 +11,123 @@ namespace YUIFramework
     public abstract class BaseContext : IUIContext
     {
         private bool _initialized;
+        private bool _destroyed;
         private readonly List<UIMessageToken> _messageTokens = new List<UIMessageToken>();
         private readonly List<IDisposable> _bindingTokens = new List<IDisposable>();
+        private readonly UIContextStateMachine _stateMachine = new UIContextStateMachine();
+        private readonly CancellationTokenSource _lifetimeCancellation = new CancellationTokenSource();
+        private readonly CancellationToken _lifetimeToken;
         private IViewModel _viewModel;
+        private IUIMessageBus _messageBus;
+        private UIContextOperation _currentOperation;
+        private bool _lifetimeCancellationDisposed;
+
+        protected BaseContext()
+        {
+            _lifetimeToken = _lifetimeCancellation.Token;
+        }
 
         public string Id { get; internal set; }
         public UILayer Layer { get; internal set; }
-        public UIContextState State { get; internal set; }
+        public UIContextState State => _stateMachine.State;
+        public Exception LastFailure => _stateMachine.LastFailure;
+        public CancellationToken LifetimeToken => _lifetimeToken;
+        public UIOperationId CurrentOperationId => _currentOperation?.Id ?? default;
+        public UIOperationKind CurrentOperationKind => _currentOperation?.Kind ?? UIOperationKind.None;
+        public UICloseDisposition CloseDisposition { get; internal set; }
         public UIView View { get; internal set; }
         public GameObject ViewObject { get; internal set; }
+        public UISortingLease SortingLease { get; internal set; }
+        public bool IsModal { get; internal set; }
         public abstract UILayer DefaultLayer { get; }
+        public virtual GameObject DefaultFocus => null;
+        protected IUIService Services { get; private set; }
 
-        internal void BindRuntime(string id, UILayer layer, UIView view, GameObject viewObject)
+        public event Action<UIContextState, UIContextState> StateChanged
         {
+            add => _stateMachine.StateChanged += value;
+            remove => _stateMachine.StateChanged -= value;
+        }
+
+        internal void BindRuntime(
+            IUIService services,
+            string id,
+            UILayer layer,
+            UIView view,
+            GameObject viewObject)
+        {
+            Services = services ?? throw new ArgumentNullException(nameof(services));
+            _messageBus = services.MessageBus;
             Id = id;
             Layer = layer;
             View = view;
             ViewObject = viewObject;
-            State = UIContextState.None;
+        }
+
+        internal bool IsInitialized => _initialized;
+
+        internal UIContextOperation BeginOperation(
+            UIOperationKind kind,
+            CancellationToken cancellationToken,
+            CancellationToken serviceCancellationToken,
+            Action onDisposed)
+        {
+            if (_currentOperation != null)
+            {
+                throw new UIOperationInProgressException(
+                    GetType(),
+                    _currentOperation.Id,
+                    _currentOperation.Kind);
+            }
+
+            var operation = new UIContextOperation(
+                this,
+                kind,
+                cancellationToken,
+                _lifetimeToken,
+                serviceCancellationToken,
+                onDisposed);
+            _currentOperation = operation;
+            return operation;
+        }
+
+        internal void CompleteOperation(UIContextOperation operation)
+        {
+            if (ReferenceEquals(_currentOperation, operation))
+            {
+                _currentOperation = null;
+            }
+        }
+
+        internal void TransitionTo(UIContextState state)
+        {
+            _stateMachine.TransitionTo(state);
+        }
+
+        internal void RecordFailure(Exception exception, bool enterFaultedState)
+        {
+            _stateMachine.RecordFailure(exception, enterFaultedState);
+        }
+
+        internal void CancelLifetime()
+        {
+            if (_lifetimeCancellationDisposed)
+            {
+                return;
+            }
+
+            try
+            {
+                if (!_lifetimeCancellation.IsCancellationRequested)
+                {
+                    _lifetimeCancellation.Cancel();
+                }
+            }
+            finally
+            {
+                _lifetimeCancellation.Dispose();
+                _lifetimeCancellationDisposed = true;
+            }
         }
 
         public void OnInit()
@@ -38,34 +138,48 @@ namespace YUIFramework
             }
 
             _initialized = true;
-            HandleInit();
+            InvokeLifecycleCallback(HandleInit);
         }
 
         public void OnShow(object args)
         {
-            State = UIContextState.Shown;
-            HandleShow(args);
+            InvokeLifecycleCallback(() => HandleShow(args));
         }
 
         public void OnHide()
         {
-            State = UIContextState.Hidden;
-            HandleHide();
+            InvokeLifecycleCallback(HandleHide);
         }
 
         public void OnClose()
         {
-            State = UIContextState.Closed;
-            HandleClose();
+            InvokeLifecycleCallback(HandleClose);
         }
 
         public void OnDestroy()
         {
-            State = UIContextState.Destroyed;
+            if (_destroyed)
+            {
+                return;
+            }
+
+            _destroyed = true;
             UnsubscribeAllMessages();
             ClearBindings();
             ClearViewModel();
-            HandleDestroy();
+            InvokeLifecycleCallback(HandleDestroy);
+        }
+
+        private void InvokeLifecycleCallback(Action callback)
+        {
+            var contextType = GetType();
+            var includeNavigation =
+                Services is UIManager manager &&
+                manager.IsNavigationCallbackType(contextType);
+            using (UIOperationReentrancyScope.Enter(contextType, includeNavigation))
+            {
+                callback();
+            }
         }
 
         protected virtual void HandleInit()
@@ -90,26 +204,26 @@ namespace YUIFramework
 
         protected UIMessageToken SubscribeMessage(string messageName, Action handler)
         {
-            var token = UIManager.Instance.MessageCenter.Subscribe(messageName, handler, this);
+            var token = GetMessageBus().Subscribe(messageName, handler, this);
             TrackMessageToken(token);
             return token;
         }
 
         protected UIMessageToken SubscribeMessage<T>(string messageName, Action<T> handler)
         {
-            var token = UIManager.Instance.MessageCenter.Subscribe(messageName, handler, this);
+            var token = GetMessageBus().Subscribe(messageName, handler, this);
             TrackMessageToken(token);
             return token;
         }
 
         protected void PublishMessage(string messageName)
         {
-            UIManager.Instance.MessageCenter.Publish(messageName);
+            GetMessageBus().Publish(messageName);
         }
 
         protected void PublishMessage<T>(string messageName, T payload)
         {
-            UIManager.Instance.MessageCenter.Publish(messageName, payload);
+            GetMessageBus().Publish(messageName, payload);
         }
 
         protected void TrackMessageToken(UIMessageToken token)
@@ -130,7 +244,7 @@ namespace YUIFramework
             }
 
             _messageTokens.Clear();
-            UIManager.Instance.MessageCenter.UnsubscribeOwner(this);
+            _messageBus?.UnsubscribeOwner(this);
         }
 
         /// <summary>
@@ -201,6 +315,12 @@ namespace YUIFramework
             {
                 vm.Dispose();
             }
+        }
+
+        private IUIMessageBus GetMessageBus()
+        {
+            return _messageBus ?? throw new InvalidOperationException(
+                $"{GetType().Name} has not been bound to an IUIService.");
         }
     }
 }
