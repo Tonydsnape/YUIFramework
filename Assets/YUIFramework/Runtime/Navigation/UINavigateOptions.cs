@@ -6,7 +6,7 @@ namespace YUIFramework
     public sealed class UINavigateOptions
     {
         /// <summary>
-        /// Push 新页面时是否隐藏当前页。
+        /// 历史兼容字段，Phase 3 起不再生效。当前导航策略始终只显示栈顶页面。
         /// </summary>
         public bool HideCurrentPage { get; set; } = true;
 
@@ -16,8 +16,10 @@ namespace YUIFramework
         public bool CloseCurrentPageOnReplace { get; set; } = true;
 
         /// <summary>
-        /// 目标页已存在时是否将其提至栈顶。
+        /// 历史兼容字段，Phase 3 起不再生效：Push/Replace 目标页若已存在于栈中的其他
+        /// 位置，永远会被提到栈顶，绝不会在栈中产生重复条目，无论这个字段是否设置。
+        /// 见 Documentation/Y2.0/Navigation.md。
         /// </summary>
-        public bool BringExistingPageToTop { get; set; } = false;
+        public bool BringExistingPageToTop { get; set; } = true;
     }
 }
