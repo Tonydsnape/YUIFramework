@@ -1,3 +1,5 @@
+using System;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using YUIFramework.HotUpdate;
@@ -20,7 +22,12 @@ namespace YUIFramework
         [SerializeField] private HotUpdatePlayMode playMode = HotUpdatePlayMode.EditorSimulate;
         [SerializeField] private bool useYooAssetLoaderForUI = false;
 
-        private async void Start()
+        private void Start()
+        {
+            RunAsync(destroyCancellationToken).Forget(Debug.LogException);
+        }
+
+        private async UniTask RunAsync(CancellationToken cancellationToken)
         {
             StartupFlowTrace.Begin("HotUpdateStartupSample");
 
@@ -29,6 +36,7 @@ namespace YUIFramework
 
             // 2. 跑热更启动链路：初始化 YooAsset -> 版本 -> 清单 -> 下载差异。
             //    无包 / 无网时返回 false 并回退，不会抛异常。
+            cancellationToken.ThrowIfCancellationRequested();
             bool yooReady = await HotUpdateLauncher.RunAsync();
             Debug.Log($"[HotUpdateStartupSample] 热更完成 yooReady={yooReady}");
 
@@ -36,7 +44,12 @@ namespace YUIFramework
             IResourceLoader loader = useYooAssetLoaderForUI
                 ? new YooAssetLoader()
                 : (IResourceLoader)new CodeViewLoader();
-            UIManager.Instance.Init(loader);
+            if (!UIManager.Instance.IsInitialized)
+            {
+                UIManager.Instance.Initialize(
+                    loader,
+                    UIRootRuntime.CreateOwned());
+            }
 
             // 4. 注册并打开首页（复用现有示例页）。
             UIManager.Instance.Register<SampleHelloPage>(new UIConfig
@@ -49,7 +62,9 @@ namespace YUIFramework
                 FullScreen = true,
             });
 
-            await UIManager.Instance.Navigator.PushAsync<SampleHelloPage>("Hello YUIFramework + YooAsset!");
+            await UIManager.Instance.Navigator.PushAsync<SampleHelloPage>(
+                "Hello YUIFramework + YooAsset!",
+                cancellationToken: cancellationToken);
             StartupFlowTrace.Complete("home page pushed");
         }
     }

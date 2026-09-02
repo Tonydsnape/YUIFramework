@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -14,7 +15,7 @@ namespace YUIFramework.HotUpdate
     ///
     /// 典型用法（由 <see cref="HotUpdateLauncher"/> 驱动）：
     ///   await HotUpdateManager.Instance.RunHotUpdateAsync(onProgress, confirm);
-    /// 之后即可 UIManager.Init(new YooAssetLoader())�?
+    /// 之后即可 UIManager.Initialize(new YooAssetLoader())�?
     /// </summary>
     public sealed class HotUpdateManager
     {
@@ -312,15 +313,31 @@ namespace YUIFramework.HotUpdate
         /// 异步加载资源。返�?YooAsset 句柄，调用方负责在不再使用时 Release�?
         /// 未就绪或未收录时返回 null（由 <see cref="YooAssetLoader"/> 决定是否回退 Resources）�?
         /// </summary>
-        public async UniTask<AssetHandle> LoadAssetAsync<T>(string location) where T : UnityEngine.Object
+        public async UniTask<AssetHandle> LoadAssetAsync<T>(
+            string location,
+            CancellationToken cancellationToken = default)
+            where T : UnityEngine.Object
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!CheckLocationValid(location))
             {
                 return null;
             }
 
             var handle = _package.LoadAssetAsync<T>(location);
-            await handle;
+            try
+            {
+                while (!handle.IsDone)
+                {
+                    await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                ReleaseHandleWhenDoneAsync(handle).Forget();
+                throw;
+            }
+
             if (handle.Status != EOperationStatus.Succeeded)
             {
                 StartupFlowTrace.Warning("resource-load.failed", $"{location}: {handle.Error}");
@@ -329,6 +346,29 @@ namespace YUIFramework.HotUpdate
             }
 
             return handle;
+        }
+
+        private static async UniTaskVoid ReleaseHandleWhenDoneAsync(AssetHandle handle)
+        {
+            if (handle == null || !handle.IsValid)
+            {
+                return;
+            }
+
+            try
+            {
+                if (!handle.IsDone)
+                {
+                    await handle;
+                }
+            }
+            finally
+            {
+                if (handle.IsValid)
+                {
+                    handle.Release();
+                }
+            }
         }
 
         private async UniTask<bool> TryActivateBuildinManifestAsync()

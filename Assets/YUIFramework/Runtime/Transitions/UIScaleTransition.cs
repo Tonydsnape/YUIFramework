@@ -1,4 +1,5 @@
-using System.Threading.Tasks;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace YUIFramework
@@ -8,7 +9,10 @@ namespace YUIFramework
     /// </summary>
     public sealed class UIScaleTransition : UITransitionBase
     {
-        public override async Task PlayShowAsync(RectTransform target, UITransitionOptions options)
+        public override async UniTask PlayShowAsync(
+            RectTransform target,
+            UITransitionOptions options,
+            CancellationToken cancellationToken = default)
         {
             if (!ValidateTarget(target))
             {
@@ -20,16 +24,24 @@ namespace YUIFramework
             var originalScale = GetOriginalScale(target);
             var startScale = originalScale * settings.StartScale;
             target.localScale = startScale;
-
-            await TweenAsync(settings.ShowDuration, settings.IgnoreTimeScale, progress =>
+            try
             {
-                target.localScale = Vector3.LerpUnclamped(startScale, originalScale, progress);
-            });
-
-            target.localScale = originalScale;
+                await TweenAsync(
+                    settings.ShowDuration,
+                    settings.IgnoreTimeScale,
+                    progress => target.localScale = Vector3.LerpUnclamped(startScale, originalScale, progress),
+                    cancellationToken);
+            }
+            finally
+            {
+                target.localScale = originalScale;
+            }
         }
 
-        public override async Task PlayHideAsync(RectTransform target, UITransitionOptions options)
+        public override async UniTask PlayHideAsync(
+            RectTransform target,
+            UITransitionOptions options,
+            CancellationToken cancellationToken = default)
         {
             if (!ValidateTarget(target))
             {
@@ -41,14 +53,18 @@ namespace YUIFramework
             var originalScale = GetOriginalScale(target);
             var endScale = originalScale * settings.StartScale;
             target.localScale = originalScale;
-
-            await TweenAsync(settings.HideDuration, settings.IgnoreTimeScale, progress =>
+            try
             {
-                target.localScale = Vector3.LerpUnclamped(originalScale, endScale, progress);
-            });
-
-            // 关闭动画完成后恢复原始缩放，避免复用或重新显示时状态漂移。
-            target.localScale = originalScale;
+                await TweenAsync(
+                    settings.HideDuration,
+                    settings.IgnoreTimeScale,
+                    progress => target.localScale = Vector3.LerpUnclamped(originalScale, endScale, progress),
+                    cancellationToken);
+            }
+            finally
+            {
+                target.localScale = originalScale;
+            }
         }
 
         private static Vector3 GetOriginalScale(RectTransform target)

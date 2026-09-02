@@ -1,4 +1,5 @@
-using System.Threading.Tasks;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace YUIFramework
@@ -8,7 +9,14 @@ namespace YUIFramework
     /// </summary>
     public interface IUITransition
     {
-        Task PlayShowAsync(RectTransform target, UITransitionOptions options);
-        Task PlayHideAsync(RectTransform target, UITransitionOptions options);
+        UniTask PlayShowAsync(
+            RectTransform target,
+            UITransitionOptions options,
+            CancellationToken cancellationToken = default);
+
+        UniTask PlayHideAsync(
+            RectTransform target,
+            UITransitionOptions options,
+            CancellationToken cancellationToken = default);
     }
 }

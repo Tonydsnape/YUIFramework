@@ -1,5 +1,6 @@
 using System.Collections.Generic;
-using System.Threading.Tasks;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace YUIFramework
@@ -11,15 +12,18 @@ namespace YUIFramework
     {
         private readonly Dictionary<string, GameObject> _prefabs = new Dictionary<string, GameObject>();
 
-        public Task<GameObject> LoadPrefabAsync(string key)
+        public UniTask<GameObject> LoadPrefabAsync(
+            string key,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!_prefabs.TryGetValue(key, out var prefab) || prefab == null)
             {
                 prefab = BuildCodePrefab(key);
                 _prefabs[key] = prefab;
             }
 
-            return Task.FromResult(prefab);
+            return UniTask.FromResult(prefab);
         }
 
         public void Release(string key, GameObject instance)

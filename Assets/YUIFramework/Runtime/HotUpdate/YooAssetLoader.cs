@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using YooAsset;
 
@@ -8,7 +9,7 @@ namespace YUIFramework.HotUpdate
 {
     /// <summary>
     /// 基于 YooAsset 的 <see cref="IResourceLoader"/> 实现，作为热更层与 UI 框架的桥接。
-    /// 使用方式：UIManager.Init(new YooAssetLoader())。
+    /// 使用方式：UIManager.Initialize(new YooAssetLoader())。
     ///
     /// 行为：
     /// - YooAsset 就绪且 location 被清单收录时，走 YooAsset 加载（可热更）。
@@ -26,8 +27,11 @@ namespace YUIFramework.HotUpdate
 
         private readonly Dictionary<string, LoadEntry> _entries = new Dictionary<string, LoadEntry>(StringComparer.Ordinal);
 
-        public async Task<GameObject> LoadPrefabAsync(string key)
+        public async UniTask<GameObject> LoadPrefabAsync(
+            string key,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (ResourcePathUtility.IsInvalidKey(key))
             {
                 throw new ResourceLoadException(key, nameof(YooAssetLoader), "PrefabKey 不能为空。");
@@ -49,7 +53,9 @@ namespace YUIFramework.HotUpdate
             }
 
             // 优先 YooAsset。
-            var handle = await HotUpdateManager.Instance.LoadAssetAsync<GameObject>(key);
+            var handle = await HotUpdateManager.Instance.LoadAssetAsync<GameObject>(
+                key,
+                cancellationToken);
             if (handle != null && handle.AssetObject is GameObject yooPrefab)
             {
                 _entries[key] = new LoadEntry { Handle = handle, RefCount = 1, FromYoo = true };
@@ -57,7 +63,7 @@ namespace YUIFramework.HotUpdate
             }
 
             // 回退 Resources。
-            var prefab = await LoadFromResourcesAsync(key);
+            var prefab = await LoadFromResourcesAsync(key, cancellationToken);
             if (prefab == null)
             {
                 var message =
@@ -97,7 +103,9 @@ namespace YUIFramework.HotUpdate
             _entries.Remove(key);
         }
 
-        private static async Task<GameObject> LoadFromResourcesAsync(string key)
+        private static async UniTask<GameObject> LoadFromResourcesAsync(
+            string key,
+            CancellationToken cancellationToken)
         {
             var normalizedKey = ResourcePathUtility.NormalizeResourcesKey(key);
             if (ResourcePathUtility.IsInvalidKey(normalizedKey))
@@ -106,10 +114,7 @@ namespace YUIFramework.HotUpdate
             }
 
             var request = Resources.LoadAsync<GameObject>(normalizedKey);
-            while (!request.isDone)
-            {
-                await Task.Yield();
-            }
+            await request.ToUniTask(cancellationToken: cancellationToken);
 
             return request.asset as GameObject;
         }

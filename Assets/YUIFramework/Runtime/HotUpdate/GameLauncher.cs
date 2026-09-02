@@ -1,3 +1,4 @@
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Events;
@@ -20,7 +21,7 @@ namespace YUIFramework.HotUpdate
         [SerializeField] private string fallbackServerURL = "";
 
         [Header("流程")]
-        [Tooltip("热更完成后是否自动 UIManager.Init(new YooAssetLoader())")]
+        [Tooltip("热更完成后是否自动初始化 UIManager")]
         [SerializeField] private bool autoInitUIManager = true;
 
         [Tooltip("热更期间显示、完成后隐藏的 Loading 根节点（可空）")]
@@ -33,13 +34,13 @@ namespace YUIFramework.HotUpdate
         /// <summary>资源系统是否已就绪。</summary>
         public bool IsReady { get; private set; }
 
-        private async void Start()
+        private void Start()
         {
-            await LaunchAsync();
+            LaunchAsync(destroyCancellationToken).Forget(Debug.LogException);
         }
 
         /// <summary>执行完整启动链路。可在业务侧手动调用（例如重试）。</summary>
-        public async UniTask LaunchAsync()
+        public async UniTask LaunchAsync(CancellationToken cancellationToken = default)
         {
             StartupFlowTrace.Begin($"GameLauncher mode={playMode}");
             ApplyConfig();
@@ -49,11 +50,18 @@ namespace YUIFramework.HotUpdate
                 loadingRoot.SetActive(true);
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             await HotUpdateLauncher.RunAsync();
 
             if (autoInitUIManager)
             {
-                UIManager.Instance.Init(new YooAssetLoader());
+                if (!UIManager.Instance.IsInitialized)
+                {
+                    UIManager.Instance.Initialize(
+                        new YooAssetLoader(),
+                        UIRootRuntime.CreateOwned());
+                }
+
                 StartupFlowTrace.Step("game-launcher.uimanager-ready");
             }
 

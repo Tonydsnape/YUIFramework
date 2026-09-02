@@ -1,4 +1,5 @@
-using System.Threading.Tasks;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace YUIFramework
@@ -13,7 +14,9 @@ namespace YUIFramework
         /// <summary>
         /// 按逻辑资源地址加载 UI 预制体资源。
         /// </summary>
-        Task<GameObject> LoadPrefabAsync(string key);
+        UniTask<GameObject> LoadPrefabAsync(
+            string key,
+            CancellationToken cancellationToken = default);
 
         /// <summary>
         /// 释放由 LoadPrefabAsync 加载并实例化后的对象。

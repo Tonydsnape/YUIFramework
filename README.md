@@ -7,7 +7,18 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 - GameFramework（分组深度、生命周期、资源抽象）
 - LoxodonFramework（后续 MVVM 与数据绑定）
 
-> Unity 版本：**2022.3.14f1 LTS**
+> 已验证 Unity 版本：**2022.3.62f2 LTS**
+
+## Y2.0 改造基线
+
+Y2.0 正在按阶段建立商用基线。阶段 0 与阶段 1 已完成：现有行为已有自动化基线，核心运行时已提供可注入 `IUIService`、显式 Initialize/Shutdown，以及 UniTask/CancellationToken 异步契约。
+
+- 基线说明：[`Documentation/Y2.0/Baseline.md`](Documentation/Y2.0/Baseline.md)
+- 分阶段路线：[`Documentation/Y2.0/Roadmap.md`](Documentation/Y2.0/Roadmap.md)
+- API 迁移矩阵：[`Documentation/Y2.0/ApiMigrationMatrix.md`](Documentation/Y2.0/ApiMigrationMatrix.md)
+- Y2 运行时契约：[`Documentation/Y2.0/Contracts.md`](Documentation/Y2.0/Contracts.md)
+- 测试说明：[`Documentation/Y2.0/Testing.md`](Documentation/Y2.0/Testing.md)
+- 变更记录：[`CHANGELOG.md`](CHANGELOG.md)
 
 ## 当前阶段
 
