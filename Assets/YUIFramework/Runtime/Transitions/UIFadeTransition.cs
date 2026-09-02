@@ -1,4 +1,5 @@
-using System.Threading.Tasks;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace YUIFramework
@@ -8,7 +9,10 @@ namespace YUIFramework
     /// </summary>
     public sealed class UIFadeTransition : UITransitionBase
     {
-        public override async Task PlayShowAsync(RectTransform target, UITransitionOptions options)
+        public override async UniTask PlayShowAsync(
+            RectTransform target,
+            UITransitionOptions options,
+            CancellationToken cancellationToken = default)
         {
             if (!ValidateTarget(target))
             {
@@ -19,14 +23,24 @@ namespace YUIFramework
             var settings = options ?? new UITransitionOptions();
             var canvasGroup = GetOrAddCanvasGroup(target);
             canvasGroup.alpha = 0f;
-            await TweenAsync(settings.ShowDuration, settings.IgnoreTimeScale, progress =>
+            try
             {
-                canvasGroup.alpha = Mathf.LerpUnclamped(0f, 1f, progress);
-            });
-            canvasGroup.alpha = 1f;
+                await TweenAsync(
+                    settings.ShowDuration,
+                    settings.IgnoreTimeScale,
+                    progress => canvasGroup.alpha = Mathf.LerpUnclamped(0f, 1f, progress),
+                    cancellationToken);
+            }
+            finally
+            {
+                canvasGroup.alpha = 1f;
+            }
         }
 
-        public override async Task PlayHideAsync(RectTransform target, UITransitionOptions options)
+        public override async UniTask PlayHideAsync(
+            RectTransform target,
+            UITransitionOptions options,
+            CancellationToken cancellationToken = default)
         {
             if (!ValidateTarget(target))
             {
@@ -37,12 +51,18 @@ namespace YUIFramework
             var settings = options ?? new UITransitionOptions();
             var canvasGroup = GetOrAddCanvasGroup(target);
             canvasGroup.alpha = 1f;
-            await TweenAsync(settings.HideDuration, settings.IgnoreTimeScale, progress =>
+            try
             {
-                canvasGroup.alpha = Mathf.LerpUnclamped(1f, 0f, progress);
-            });
-            // 动画结束后恢复到可见状态，避免对象复用时残留透明度。
-            canvasGroup.alpha = 1f;
+                await TweenAsync(
+                    settings.HideDuration,
+                    settings.IgnoreTimeScale,
+                    progress => canvasGroup.alpha = Mathf.LerpUnclamped(1f, 0f, progress),
+                    cancellationToken);
+            }
+            finally
+            {
+                canvasGroup.alpha = 1f;
+            }
         }
 
         private static CanvasGroup GetOrAddCanvasGroup(RectTransform target)

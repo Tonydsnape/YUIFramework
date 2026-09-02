@@ -1,4 +1,5 @@
-using System.Threading.Tasks;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace YUIFramework
@@ -8,7 +9,10 @@ namespace YUIFramework
     /// </summary>
     public sealed class UISlideTransition : UITransitionBase
     {
-        public override async Task PlayShowAsync(RectTransform target, UITransitionOptions options)
+        public override async UniTask PlayShowAsync(
+            RectTransform target,
+            UITransitionOptions options,
+            CancellationToken cancellationToken = default)
         {
             if (!ValidateTarget(target))
             {
@@ -21,16 +25,24 @@ namespace YUIFramework
             var offset = ResolveOffset(settings.Type, settings.SlideDistance);
             var start = original + offset;
             target.anchoredPosition = start;
-
-            await TweenAsync(settings.ShowDuration, settings.IgnoreTimeScale, progress =>
+            try
             {
-                target.anchoredPosition = Vector2.LerpUnclamped(start, original, progress);
-            });
-
-            target.anchoredPosition = original;
+                await TweenAsync(
+                    settings.ShowDuration,
+                    settings.IgnoreTimeScale,
+                    progress => target.anchoredPosition = Vector2.LerpUnclamped(start, original, progress),
+                    cancellationToken);
+            }
+            finally
+            {
+                target.anchoredPosition = original;
+            }
         }
 
-        public override async Task PlayHideAsync(RectTransform target, UITransitionOptions options)
+        public override async UniTask PlayHideAsync(
+            RectTransform target,
+            UITransitionOptions options,
+            CancellationToken cancellationToken = default)
         {
             if (!ValidateTarget(target))
             {
@@ -43,14 +55,18 @@ namespace YUIFramework
             var offset = ResolveOffset(settings.Type, settings.SlideDistance);
             var end = original + offset;
             target.anchoredPosition = original;
-
-            await TweenAsync(settings.HideDuration, settings.IgnoreTimeScale, progress =>
+            try
             {
-                target.anchoredPosition = Vector2.LerpUnclamped(original, end, progress);
-            });
-
-            // 关闭结束后恢复原始位置，避免对象池复用时位置错乱。
-            target.anchoredPosition = original;
+                await TweenAsync(
+                    settings.HideDuration,
+                    settings.IgnoreTimeScale,
+                    progress => target.anchoredPosition = Vector2.LerpUnclamped(original, end, progress),
+                    cancellationToken);
+            }
+            finally
+            {
+                target.anchoredPosition = original;
+            }
         }
 
         private static Vector2 ResolveOffset(UITransitionType type, float distance)

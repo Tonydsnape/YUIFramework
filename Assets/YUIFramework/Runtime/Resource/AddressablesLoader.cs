@@ -1,7 +1,8 @@
 #if YUIFRAMEWORK_ADDRESSABLES
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
@@ -22,8 +23,11 @@ namespace YUIFramework
         private readonly Dictionary<string, AddressablePrefabHandle> _handles =
             new Dictionary<string, AddressablePrefabHandle>();
 
-        public async Task<GameObject> LoadPrefabAsync(string key)
+        public async UniTask<GameObject> LoadPrefabAsync(
+            string key,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var loaderType = nameof(AddressablesLoader);
             if (ResourcePathUtility.IsInvalidKey(key))
             {
@@ -35,11 +39,26 @@ namespace YUIFramework
                 tracked.RefCount++;
                 try
                 {
-                    await tracked.Handle.Task;
+                    await tracked.Handle.Task.AsUniTask().AttachExternalCancellation(cancellationToken);
                     if (tracked.Handle.Status == AsyncOperationStatus.Succeeded && tracked.Handle.Result != null)
                     {
                         return tracked.Handle.Result;
                     }
+                }
+                catch (OperationCanceledException)
+                {
+                    tracked.RefCount--;
+                    if (tracked.RefCount <= 0)
+                    {
+                        if (tracked.Handle.IsValid())
+                        {
+                            Addressables.Release(tracked.Handle);
+                        }
+
+                        _handles.Remove(key);
+                    }
+
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -87,7 +106,7 @@ namespace YUIFramework
 
             try
             {
-                await handle.Task;
+                await handle.Task.AsUniTask().AttachExternalCancellation(cancellationToken);
                 if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
                 {
                     var statusMessage = handle.OperationException != null
@@ -100,6 +119,16 @@ namespace YUIFramework
                 }
 
                 return handle.Result;
+            }
+            catch (OperationCanceledException)
+            {
+                if (handle.IsValid())
+                {
+                    Addressables.Release(handle);
+                }
+
+                _handles.Remove(key);
+                throw;
             }
             catch (ResourceLoadException)
             {

@@ -1,5 +1,5 @@
-using System;
-using System.Threading.Tasks;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace YUIFramework
@@ -13,18 +13,37 @@ namespace YUIFramework
         private readonly IUITransition _scale = new UIScaleTransition();
         private readonly IUITransition _slide = new UISlideTransition();
 
-        public Task PlayShowAsync(RectTransform target, UITransitionOptions options)
+        public UniTask PlayShowAsync(
+            RectTransform target,
+            UITransitionOptions options,
+            CancellationToken cancellationToken = default)
         {
-            return PlayAsync(target, options, isShow: true);
+            return PlayAsync(
+                target,
+                options,
+                isShow: true,
+                cancellationToken: cancellationToken);
         }
 
-        public Task PlayHideAsync(RectTransform target, UITransitionOptions options)
+        public UniTask PlayHideAsync(
+            RectTransform target,
+            UITransitionOptions options,
+            CancellationToken cancellationToken = default)
         {
-            return PlayAsync(target, options, isShow: false);
+            return PlayAsync(
+                target,
+                options,
+                isShow: false,
+                cancellationToken: cancellationToken);
         }
 
-        private async Task PlayAsync(RectTransform target, UITransitionOptions options, bool isShow)
+        private async UniTask PlayAsync(
+            RectTransform target,
+            UITransitionOptions options,
+            bool isShow,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (options == null || options.Type == UITransitionType.None)
             {
                 return;
@@ -37,20 +56,13 @@ namespace YUIFramework
                 return;
             }
 
-            try
+            if (isShow)
             {
-                if (isShow)
-                {
-                    await transition.PlayShowAsync(target, options);
-                }
-                else
-                {
-                    await transition.PlayHideAsync(target, options);
-                }
+                await transition.PlayShowAsync(target, options, cancellationToken);
             }
-            catch (Exception ex)
+            else
             {
-                Debug.LogException(ex);
+                await transition.PlayHideAsync(target, options, cancellationToken);
             }
         }
 

@@ -1,51 +1,63 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace YUIFramework
 {
     /// <summary>
-    /// 全局 UI 根节点，负责 Canvas、EventSystem 与分层根节点初始化。
+    /// Canvas host used by <see cref="UIRootRuntime"/>. It never searches for or creates
+    /// scene objects by itself.
     /// </summary>
     public sealed class UIRoot : MonoBehaviour
     {
-        private static UIRoot _instance;
+        private static UIRoot _active;
         private readonly Dictionary<UILayer, RectTransform> _layerRoots = new Dictionary<UILayer, RectTransform>();
-        private bool _initialized;
+        private readonly List<GameObject> _generatedLayers = new List<GameObject>();
+        private UIRootRuntime _owner;
 
+        [Obsolete("Inject UIRootRuntime into UIManager. Instance no longer creates or searches for objects.")]
         public static UIRoot Instance
         {
             get
             {
-                if (_instance == null)
+                if (_active == null)
                 {
-                    _instance = FindObjectOfType<UIRoot>();
-                    if (_instance == null)
-                    {
-                        var rootObject = new GameObject(nameof(UIRoot));
-                        _instance = rootObject.AddComponent<UIRoot>();
-                    }
+                    throw new InvalidOperationException(
+                        "No active UIRoot exists. Create a UIRootRuntime or inject a complete UIRoot.");
                 }
 
-                _instance.EnsureInitialized();
-
-                return _instance;
+                return _active;
             }
+        }
+
+        public static UIRoot Active => _active;
+        public bool IsClaimed => _owner != null;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            _active = null;
         }
 
         private void Awake()
         {
-            if (_instance != null && _instance != this)
+            if (_active == null)
             {
-                Destroy(gameObject);
-                return;
+                _active = this;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (_active == this)
+            {
+                _active = null;
             }
 
-            _instance = this;
-            DontDestroyOnLoad(gameObject);
-            EnsureInitialized();
+            _owner = null;
+            _layerRoots.Clear();
+            _generatedLayers.Clear();
         }
 
         public RectTransform GetLayerRoot(UILayer layer)
@@ -58,69 +70,125 @@ namespace YUIFramework
             throw new InvalidOperationException($"UILayer root not found: {layer}");
         }
 
-        private void EnsureRootComponents()
+        internal void Claim(UIRootRuntime owner)
         {
-            var canvas = gameObject.GetComponent<Canvas>() ?? gameObject.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            if (owner == null)
+            {
+                throw new ArgumentNullException(nameof(owner));
+            }
 
-            var scaler = gameObject.GetComponent<CanvasScaler>() ?? gameObject.AddComponent<CanvasScaler>();
+            if (_owner != null && !ReferenceEquals(_owner, owner))
+            {
+                throw new InvalidOperationException("The UIRoot is already owned by another runtime.");
+            }
+
+            if (_active != null && _active != this && _active.IsClaimed)
+            {
+                throw new InvalidOperationException(
+                    $"A different UIRoot is already active: {_active.name}.");
+            }
+
+            _active = this;
+            _owner = owner;
+        }
+
+        internal void Release(UIRootRuntime owner)
+        {
+            if (!ReferenceEquals(_owner, owner))
+            {
+                return;
+            }
+
+            _owner = null;
+            if (_active == this)
+            {
+                _active = null;
+            }
+
+            ClearGeneratedLayers();
+        }
+
+        internal void Configure(
+            UILayerProfile profile,
+            RenderMode renderMode,
+            Camera eventCamera)
+        {
+            if (profile == null)
+            {
+                throw new ArgumentNullException(nameof(profile));
+            }
+
+            var rect = GetComponent<RectTransform>();
+            var canvas = GetComponent<Canvas>();
+            var scaler = GetComponent<CanvasScaler>();
+            var raycaster = GetComponent<GraphicRaycaster>();
+            if (rect == null || canvas == null || scaler == null || raycaster == null)
+            {
+                throw new InvalidOperationException(
+                    "UIRoot requires RectTransform, Canvas, CanvasScaler, and GraphicRaycaster.");
+            }
+
+            if (renderMode != RenderMode.ScreenSpaceOverlay && eventCamera == null)
+            {
+                throw new ArgumentException(
+                    "A camera is required for ScreenSpaceCamera and WorldSpace UIRoot modes.",
+                    nameof(eventCamera));
+            }
+
+            canvas.renderMode = renderMode;
+            canvas.worldCamera = renderMode == RenderMode.ScreenSpaceOverlay ? null : eventCamera;
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
+            raycaster.enabled = true;
 
-            _ = gameObject.GetComponent<GraphicRaycaster>() ?? gameObject.AddComponent<GraphicRaycaster>();
-        }
-
-        private static void EnsureEventSystem()
-        {
-            if (FindObjectOfType<EventSystem>() != null)
+            ClearGeneratedLayers();
+            foreach (var descriptor in profile.Descriptors)
             {
-                return;
-            }
+                var layerObject = new GameObject(
+                    $"Layer_{descriptor.Layer}",
+                    typeof(RectTransform),
+                    typeof(Canvas),
+                    typeof(GraphicRaycaster));
+                var layerRect = layerObject.GetComponent<RectTransform>();
+                layerRect.SetParent(transform, false);
+                layerRect.anchorMin = Vector2.zero;
+                layerRect.anchorMax = Vector2.one;
+                layerRect.offsetMin = Vector2.zero;
+                layerRect.offsetMax = Vector2.zero;
+                layerRect.localScale = Vector3.one;
 
-            var eventObject = new GameObject("EventSystem");
-            eventObject.AddComponent<EventSystem>();
-            eventObject.AddComponent<StandaloneInputModule>();
-            DontDestroyOnLoad(eventObject);
-        }
-
-        private void BuildLayerRoots()
-        {
-            if (_layerRoots.Count > 0)
-            {
-                return;
-            }
-
-            foreach (UILayer layer in Enum.GetValues(typeof(UILayer)))
-            {
-                var layerObject = new GameObject($"Layer_{layer}");
-                var rect = layerObject.AddComponent<RectTransform>();
-                rect.SetParent(transform, false);
-                rect.anchorMin = Vector2.zero;
-                rect.anchorMax = Vector2.one;
-                rect.offsetMin = Vector2.zero;
-                rect.offsetMax = Vector2.zero;
-                rect.localScale = Vector3.one;
-
-                var layerCanvas = layerObject.AddComponent<Canvas>();
+                var layerCanvas = layerObject.GetComponent<Canvas>();
                 layerCanvas.overrideSorting = true;
-                layerCanvas.sortingOrder = (int)layer;
-
-                layerObject.AddComponent<GraphicRaycaster>();
-                _layerRoots[layer] = rect;
+                layerCanvas.sortingOrder = descriptor.SortingBase;
+                layerObject.GetComponent<GraphicRaycaster>().enabled = descriptor.Interactable;
+                _layerRoots.Add(descriptor.Layer, layerRect);
+                _generatedLayers.Add(layerObject);
             }
         }
 
-        private void EnsureInitialized()
+        private void ClearGeneratedLayers()
         {
-            if (_initialized)
+            _layerRoots.Clear();
+            for (var i = _generatedLayers.Count - 1; i >= 0; i--)
             {
-                return;
+                var generated = _generatedLayers[i];
+                if (generated == null)
+                {
+                    continue;
+                }
+
+                generated.transform.SetParent(null, false);
+                if (Application.isPlaying)
+                {
+                    Destroy(generated);
+                }
+                else
+                {
+                    DestroyImmediate(generated);
+                }
             }
 
-            EnsureRootComponents();
-            EnsureEventSystem();
-            BuildLayerRoots();
-            _initialized = true;
+            _generatedLayers.Clear();
         }
     }
 }

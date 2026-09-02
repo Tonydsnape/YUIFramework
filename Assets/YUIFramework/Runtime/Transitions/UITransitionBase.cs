@@ -1,5 +1,6 @@
 using System;
-using System.Threading.Tasks;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace YUIFramework
@@ -9,8 +10,15 @@ namespace YUIFramework
     /// </summary>
     public abstract class UITransitionBase : IUITransition
     {
-        public abstract Task PlayShowAsync(RectTransform target, UITransitionOptions options);
-        public abstract Task PlayHideAsync(RectTransform target, UITransitionOptions options);
+        public abstract UniTask PlayShowAsync(
+            RectTransform target,
+            UITransitionOptions options,
+            CancellationToken cancellationToken = default);
+
+        public abstract UniTask PlayHideAsync(
+            RectTransform target,
+            UITransitionOptions options,
+            CancellationToken cancellationToken = default);
 
         protected static bool ValidateTarget(RectTransform target)
         {
@@ -23,8 +31,13 @@ namespace YUIFramework
             return false;
         }
 
-        protected async Task TweenAsync(float duration, bool ignoreTimeScale, Action<float> onUpdate)
+        protected async UniTask TweenAsync(
+            float duration,
+            bool ignoreTimeScale,
+            Action<float> onUpdate,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (onUpdate == null)
             {
                 return;
@@ -39,6 +52,7 @@ namespace YUIFramework
             var elapsed = 0f;
             while (elapsed < duration)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var delta = ignoreTimeScale ? Time.unscaledDeltaTime : Time.deltaTime;
                 if (delta < 0f)
                 {
@@ -48,7 +62,7 @@ namespace YUIFramework
                 elapsed += delta;
                 var t = Mathf.Clamp01(elapsed / duration);
                 onUpdate(EaseOutCubic(t));
-                await Task.Yield();
+                await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
             }
 
             onUpdate(1f);

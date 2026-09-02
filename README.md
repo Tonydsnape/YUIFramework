@@ -1,13 +1,24 @@
 # YUIFramework
 
-YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架 + P2 栈式页面导航 + P3 资源加载体系增强 + P4 UI 对象池缓存增强 + P5 UI 消息中心 + P6 轻量虚拟列表 + P7 轻量转场动画**。
+YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架 + P2 栈式页面导航 + P3 资源加载体系增强 + P4 UI 对象池缓存增强 + P5 UI 消息中心 + P6 轻量虚拟列表 + P7 轻量转场动画 + P8 轻量 MVVM / 数据绑定基础层 + P9 YooAsset 热更 / 启动链路**。
 
 设计灵感来自：
 - 原神 `MoleMole.UIManager`（Context / Layer / 配置驱动）
 - GameFramework（分组深度、生命周期、资源抽象）
 - LoxodonFramework（后续 MVVM 与数据绑定）
 
-> Unity 版本：**2022.3.14f1 LTS**
+> 已验证 Unity 版本：**2022.3.62f2 LTS**
+
+## Y2.0 改造基线
+
+Y2.0 正在按阶段建立商用基线。阶段 0 与阶段 1 已完成：现有行为已有自动化基线，核心运行时已提供可注入 `IUIService`、显式 Initialize/Shutdown，以及 UniTask/CancellationToken 异步契约。
+
+- 基线说明：[`Documentation/Y2.0/Baseline.md`](Documentation/Y2.0/Baseline.md)
+- 分阶段路线：[`Documentation/Y2.0/Roadmap.md`](Documentation/Y2.0/Roadmap.md)
+- API 迁移矩阵：[`Documentation/Y2.0/ApiMigrationMatrix.md`](Documentation/Y2.0/ApiMigrationMatrix.md)
+- Y2 运行时契约：[`Documentation/Y2.0/Contracts.md`](Documentation/Y2.0/Contracts.md)
+- 测试说明：[`Documentation/Y2.0/Testing.md`](Documentation/Y2.0/Testing.md)
+- 变更记录：[`CHANGELOG.md`](CHANGELOG.md)
 
 ## 当前阶段
 
@@ -19,6 +30,8 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 - P5 UI 消息中心 / 事件总线（✅）
 - P6 虚拟列表 / 大量 UI 元素优化（✅）
 - P7 UI 转场动画 / 页面过渡系统（✅）
+- P8 MVVM / 数据绑定基础层（✅）
+- P9 YooAsset 热更 / 启动链路（✅，YooAsset 3.x + UniTask）
 
 核心能力：
 - 分层系统（`UILayer` + 每层独立 Canvas）
@@ -30,6 +43,7 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 - UI 缓存池（`CacheOnClose` + `MaxPoolSize`）
 - 轻量虚拟列表（`UIVirtualList`，固定尺寸 item 复用）
 - 轻量转场动画（Fade / Scale / Slide）
+- 轻量 MVVM（`ObservableProperty` + `UIDataBinding`）
 - 纯代码示例（无需提交 prefab / scene 二进制资源）
 
 ## 架构总览
@@ -324,6 +338,127 @@ uiManager.Register<MainMenuPageContext>(new UIConfig
 - `HideWithoutClose`（栈下页面临时隐藏）保持原行为，不播放 close transition。
 - 对象池复用时：出池播放 Show，入池前播放 Hide。
 
+## P8 MVVM / 数据绑定基础层
+
+P8 新增 `Runtime/MVVM`，提供轻量可观察属性、集合和 uGUI 代码式绑定：
+
+- `ObservableProperty<T>`：值变化通知
+- `ObservableCollection<T>`：集合变更通知（Add / Remove / Clear / Reset）
+- `ViewModelBase`：统一跟踪并释放订阅
+- `UIDataBinding`：绑定 `Text / Toggle / Slider`
+- 绑定模式：`OneWay / TwoWay / OneTime`
+
+基础示例：
+
+```csharp
+public sealed class LoginViewModel : ViewModelBase
+{
+    public ObservableProperty<string> UserName { get; } = new ObservableProperty<string>(string.Empty);
+    public ObservableProperty<bool> RememberMe { get; } = new ObservableProperty<bool>(false);
+}
+
+protected override void HandleInit()
+{
+    var vm = new LoginViewModel();
+    SetViewModel(vm);
+    TrackBinding(UIDataBinding.BindText(titleText, vm.UserName));
+    TrackBinding(UIDataBinding.BindToggle(toggle, vm.RememberMe));
+}
+```
+
+生命周期说明：
+- `BaseContext.OnDestroy` 会自动调用 `ClearBindings()` 与 `ClearViewModel()`。
+- 入池对象不会触发 `OnDestroy`，因此 ViewModel 与绑定会保留。
+- 若业务要求隐藏即解绑，可在 `HandleHide` 手动调用 `ClearBindings()` / `ClearViewModel()`。
+
+## P9 YooAsset 热更 + 启动链路
+
+P9 新增可选热更层 `Runtime/HotUpdate`（独立程序集 `YUIFramework.HotUpdate`），把 **YooAsset 3.x** 资源系统与启动链路接入框架。UI 核心程序集保持零第三方依赖，热更作为**可插拔层**存在。
+
+> 依赖：`com.tuyoogame.yooasset` 3.0.5（已在 manifest）+ `com.cysharp.unitask`。
+
+### 模块组成
+
+| 类型 | 作用 |
+|---|---|
+| `HotUpdatePlayMode` | 运行模式枚举：`EditorSimulate / Offline / Host` |
+| `HotUpdateConfig` | 包名、模式、CDN 主备地址、下载并发/重试/超时 |
+| `RemoteServices` | YooAsset 远端地址解析（`IRemoteService.GetRemoteUrls`），支持内置清单回退 |
+| `HotUpdateManager` | 核心：初始化包 → 请求版本 → 更新清单 → 下载差异 → 加载资源 |
+| `HotUpdateLauncher` | 启动期热更入口，暴露进度/状态/体积/确认事件 |
+| `StartupFlowTrace` | 结构化启动诊断（带序号与耗时） |
+| `YooAssetLoader` | `IResourceLoader` 实现，桥接 `UIManager`，命中失败回退 Resources |
+| `HotUpdateProgressUI` | uGUI 进度条组件，订阅 Launcher 事件自动显示 |
+| `GameLauncher` | 串联「设模式 → 热更(Loading) → UIManager → 业务回调」 |
+
+### 启动链路
+
+```text
+LoadScene → GameLauncher/Bootstrap
+        → HotUpdateLauncher.RunAsync()   // 初始化→版本→清单→下载，带 Loading UI
+        → UIManager.Init(new YooAssetLoader())
+        → 注册并打开首页
+```
+
+### 与 UI 框架集成
+
+只需把 `UIManager.Init` 的 loader 换成 `YooAssetLoader` 即可用 YooAsset 加载 UI 预制体：
+
+```csharp
+UIManager.Instance.Init(new YooAssetLoader());
+UIManager.Instance.Register<MainMenuPageContext>(new UIConfig
+{
+    Id = "MainMenuPage",
+    PrefabKey = "UI/Pages/MainMenuPage", // 与 YooAsset 收集器的资源地址一致
+    Layer = UILayer.Normal,
+});
+await UIManager.Instance.Navigator.PushAsync<MainMenuPageContext>();
+```
+
+`YooAssetLoader` 优先走 YooAsset（可热更），未就绪或清单未收录时自动回退 `Resources`，保证示例在未构建资源包时仍可运行。
+
+### 运行模式与本地联调
+
+编辑器菜单 `Tools/YUIFramework/HotUpdate 设置`：
+- 切换运行模式（EditorSimulate / Offline / Host）
+- 设置本地 CDN 地址
+- 快捷打开 YooAsset 官方 Collector / Builder 窗口
+
+本地 CDN 联调：用 YooAsset Builder 构建后，把输出目录用静态服务器（如 `python -m http.server 8080`）托管，Host 地址填 `http://127.0.0.1:8080`。
+
+### 端到端示例
+
+`Examples/HotUpdateStartupSample.cs` 演示完整链路：跑热更（无包时优雅回退）→ 初始化 UIManager → 打开首页。挂到空物体即可运行。
+
+### 与参考框架的差异（有意裁剪）
+
+本实现从生产级热更框架吸取骨架，但面向**示例项目**做了大幅裁剪与优化：
+- 拆分单体 `ResourceManager` 为 `Config + Manager + Loader` 三块。
+- 热更独立成可选程序集，UI 核心零第三方依赖。
+- 运行模式用单枚举 + 编辑器工具，替代 channel/environment/marker 多环境矩阵。
+- **不含** DurableSeed 持久化、Atlas 提供器、Prefetch 调度、内容寻址多环境 Profile 等业务专用逻辑。
+
+### YooAsset 2.x → 3.0.5 原生 API 说明
+
+参考代码基于 YooAsset 2.3.18，本项目使用 3.0.5，且**采用 3.x 原生 API**（未开启 `YOOASSET_LEGACY_API` 兼容层，因此没有 `[Obsolete]` 警告）。关键映射：
+
+| 用途 | 2.3 兼容写法（本项目未用） | 3.0.5 原生写法（本项目采用） |
+| --- | --- | --- |
+| 远端地址 | `IRemoteServices.GetRemoteMainURL/FallbackURL` | `IRemoteService.GetRemoteUrls`（返回候选地址列表） |
+| 初始化参数 | `InitializeParameters` + `XxxModeParameters` | `InitializePackageOptions` + `EditorSimulateModeOptions`/`OfflinePlayModeOptions`/`HostPlayModeOptions` |
+| 初始化 | `package.InitializeAsync(params)` | `package.InitializePackageAsync(options)` |
+| 缓存文件系统 | `CreateDefaultCacheFileSystemParameters` | `CreateDefaultSandboxFileSystemParameters`（Cache 更名 Sandbox） |
+| 请求版本 | `RequestPackageVersionAsync(bool,int)` | `RequestPackageVersionAsync(new RequestPackageVersionOptions(bool,int))` |
+| 更新清单 | `UpdatePackageManifestAsync(version)` | `LoadPackageManifestAsync(new LoadPackageManifestOptions(version,timeout))` |
+| 创建下载器 | `CreateResourceDownloader(int,int)` | `CreateResourceDownloader(new ResourceDownloaderOptions(int,int))` |
+| 下载进度 | `DownloadUpdateCallback` + `BeginDownload()` | `DownloadProgressChanged` 事件 + `StartDownload()` |
+| 资源校验 | `package.CheckLocationValid(location)` | `package.GetAssetInfo(location).IsValid` |
+| 等待操作 | `await op.Task` | `await op`（`OperationAwaiter`） |
+| 句柄错误 | `handle.LastError` | `handle.Error` |
+| 编辑器模拟构建 | `EditorSimulateModeHelper.SimulateBuild(name)` | `EditorSimulateBuildInvoker.Build(name, (int)EBundleType.VirtualAssetBundle)` |
+
+内置文件系统用 `CreateDefaultBuiltinFileSystemParameters()`，状态枚举统一使用 `EOperationStatus.Succeeded`。
+
 ## 路线图
 
 - P1 核心骨架（✅）
@@ -333,10 +468,10 @@ uiManager.Register<MainMenuPageContext>(new UIConfig
 - P5 消息中心（✅）
 - P6 虚拟列表 / 大量 UI 元素优化（✅）
 - P7 转场动画（✅）
-- P8 MVVM / 数据绑定
-- P9 Editor 工具
-- P10 示例与测试完善
+- P8 MVVM / 数据绑定（✅）
+- P9 YooAsset 热更 + 启动链路（✅，YooAsset 3.x + UniTask）
+- P10 Editor 工具 / 代码生成 / 测试完善（⏳）
 
 ---
 
-当前仓库已落地 P1 + P2 + P3 + P4 + P5 + P6 + P7，P8 及后续模块待实现。
+当前仓库已落地 P1 ~ P9，P10 及后续模块待实现。

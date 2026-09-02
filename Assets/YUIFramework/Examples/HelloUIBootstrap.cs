@@ -1,3 +1,6 @@
+using System;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace YUIFramework
@@ -7,71 +10,92 @@ namespace YUIFramework
     /// </summary>
     public class HelloUIBootstrap : MonoBehaviour
     {
-        private bool _isHandlingBackNavigation;
+        private IUIService _uiService;
 
-        private async void Start()
+        private void Start()
         {
-            var uiManager = UIManager.Instance;
-            uiManager.Init(new CodeViewLoader());
-            uiManager.Register<SampleHelloPage>(new UIConfig
-            {
-                Id = "HelloPage",
-                PrefabKey = "SampleHelloPage",
-                Layer = UILayer.Normal,
-                CacheOnClose = true,
-                MaxPoolSize = 1,
-                FullScreen = true,
-                UseTransition = true,
-                TransitionType = UITransitionType.Fade,
-                ShowDuration = 0.2f,
-                HideDuration = 0.15f,
-            });
-            uiManager.Register<SecondSamplePage>(new UIConfig
-            {
-                Id = "SecondSamplePage",
-                PrefabKey = "SecondSamplePage",
-                Layer = UILayer.Normal,
-                CacheOnClose = false,
-                FullScreen = true,
-                UseTransition = true,
-                TransitionType = UITransitionType.SlideLeft,
-                ShowDuration = 0.25f,
-                HideDuration = 0.2f,
-                SlideDistance = 900f,
-            });
-            uiManager.Register<VirtualListSamplePage>(new UIConfig
-            {
-                Id = "VirtualListSamplePage",
-                PrefabKey = "VirtualListSamplePage",
-                Layer = UILayer.Normal,
-                CacheOnClose = true,
-                MaxPoolSize = 1,
-                FullScreen = true,
-                UseTransition = true,
-                TransitionType = UITransitionType.Scale,
-                ShowDuration = 0.2f,
-                HideDuration = 0.15f,
-                StartScale = 0.92f,
-            });
-
-            await uiManager.Navigator.PushAsync<SampleHelloPage>("Hello YUIFramework!");
+            RunAsync(destroyCancellationToken).Forget(Debug.LogException);
         }
 
-        private async void Update()
+        private async UniTask RunAsync(CancellationToken cancellationToken)
         {
-            if (_isHandlingBackNavigation || !Input.GetKeyDown(KeyCode.Escape))
-            {
-                return;
-            }
-
-            _isHandlingBackNavigation = true;
+            _uiService = new UIManager();
             try
             {
-                await UIManager.Instance.Navigator.BackAsync();
+                var rootRuntime = UIRootRuntime.CreateOwned();
+                await _uiService.InitializeAsync(
+                    new CodeViewLoader(),
+                    rootRuntime,
+                    cancellationToken: cancellationToken);
+
+                _uiService.Register<SampleHelloPage>(new UIConfig
+                {
+                    Id = "HelloPage",
+                    PrefabKey = "SampleHelloPage",
+                    Layer = UILayer.Normal,
+                    CacheOnClose = true,
+                    MaxPoolSize = 1,
+                    FullScreen = true,
+                    UseTransition = true,
+                    TransitionType = UITransitionType.Fade,
+                    ShowDuration = 0.2f,
+                    HideDuration = 0.15f,
+                });
+                _uiService.Register<SecondSamplePage>(new UIConfig
+                {
+                    Id = "SecondSamplePage",
+                    PrefabKey = "SecondSamplePage",
+                    Layer = UILayer.Normal,
+                    CacheOnClose = false,
+                    FullScreen = true,
+                    UseTransition = true,
+                    TransitionType = UITransitionType.SlideLeft,
+                    ShowDuration = 0.25f,
+                    HideDuration = 0.2f,
+                    SlideDistance = 900f,
+                });
+                _uiService.Register<VirtualListSamplePage>(new UIConfig
+                {
+                    Id = "VirtualListSamplePage",
+                    PrefabKey = "VirtualListSamplePage",
+                    Layer = UILayer.Normal,
+                    CacheOnClose = true,
+                    MaxPoolSize = 1,
+                    FullScreen = true,
+                    UseTransition = true,
+                    TransitionType = UITransitionType.Scale,
+                    ShowDuration = 0.2f,
+                    HideDuration = 0.15f,
+                    StartScale = 0.92f,
+                });
+                _uiService.Register<MvvmSamplePage>(new UIConfig
+                {
+                    Id = "MvvmSamplePage",
+                    PrefabKey = "MvvmSamplePage",
+                    Layer = UILayer.Normal,
+                    CacheOnClose = true,
+                    MaxPoolSize = 1,
+                    FullScreen = true,
+                    UseTransition = true,
+                    TransitionType = UITransitionType.Fade,
+                    ShowDuration = 0.18f,
+                    HideDuration = 0.15f,
+                });
+
+                await _uiService.Navigator.PushAsync<SampleHelloPage>(
+                    "Hello YUIFramework!",
+                    cancellationToken: cancellationToken);
+                await UniTask.WaitUntilCanceled(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
             }
             finally
             {
-                _isHandlingBackNavigation = false;
+                if (_uiService.IsInitialized)
+                {
+                    await _uiService.ShutdownAsync();
+                }
             }
         }
     }

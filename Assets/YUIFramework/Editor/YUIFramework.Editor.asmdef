@@ -2,7 +2,8 @@
   "name": "YUIFramework.Editor",
   "rootNamespace": "YUIFramework.Editor",
   "references": [
-    "YUIFramework.Runtime"
+    "YUIFramework.Runtime",
+    "YUIFramework.HotUpdate"
   ],
   "includePlatforms": [
     "Editor"

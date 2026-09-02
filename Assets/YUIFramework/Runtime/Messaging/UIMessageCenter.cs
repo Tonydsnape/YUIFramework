@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace YUIFramework
 {
-    public sealed class UIMessageCenter
+    public sealed class UIMessageCenter : IUIMessageBus
     {
         private readonly Dictionary<string, List<UIMessageSubscription>> _subscriptionsByMessage =
             new Dictionary<string, List<UIMessageSubscription>>(StringComparer.Ordinal);

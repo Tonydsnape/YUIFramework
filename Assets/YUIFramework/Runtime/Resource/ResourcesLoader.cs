@@ -1,4 +1,5 @@
-using System.Threading.Tasks;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace YUIFramework
@@ -9,8 +10,11 @@ namespace YUIFramework
     /// </summary>
     public sealed class ResourcesLoader : IResourceLoader
     {
-        public async Task<GameObject> LoadPrefabAsync(string key)
+        public async UniTask<GameObject> LoadPrefabAsync(
+            string key,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var normalizedKey = ResourcePathUtility.NormalizeResourcesKey(key);
             if (ResourcePathUtility.IsInvalidKey(normalizedKey))
             {
@@ -26,10 +30,7 @@ namespace YUIFramework
             }
 
             var request = Resources.LoadAsync<GameObject>(normalizedKey);
-            while (!request.isDone)
-            {
-                await Task.Yield();
-            }
+            await request.ToUniTask(cancellationToken: cancellationToken);
 
             var prefab = request.asset as GameObject;
             if (prefab == null)

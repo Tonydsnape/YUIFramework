@@ -11,6 +11,8 @@ namespace YUIFramework
         /// <summary>唯一 ID，例如 HelloPage。</summary>
         public string Id;
 
+        public UIKey Key => new UIKey(Id);
+
         /// <summary>资源地址，传入 IResourceLoader。</summary>
         public string PrefabKey;
 
@@ -28,7 +30,7 @@ namespace YUIFramework
         public int MaxPoolSize = 1;
 
         /// <summary>
-        /// 预加载数量（P4 先保留配置字段，后续可扩展预热逻辑）。
+        /// 预加载数量。资源预热仍属于阶段 5 之后的资源/池治理范围。
         /// </summary>
         public int PreloadCount;
 
@@ -36,6 +38,12 @@ namespace YUIFramework
         /// 是否全屏（后续导航栈遮挡策略使用）。
         /// </summary>
         public bool FullScreen;
+
+        /// <summary>True 时使用层 profile 的模态策略；false 时使用 Modal。</summary>
+        public bool UseLayerModalPolicy = true;
+
+        /// <summary>UseLayerModalPolicy=false 时的 Context 模态覆盖。</summary>
+        public bool Modal;
 
         /// <summary>
         /// 是否启用 UI 转场动画。默认关闭以保持兼容。

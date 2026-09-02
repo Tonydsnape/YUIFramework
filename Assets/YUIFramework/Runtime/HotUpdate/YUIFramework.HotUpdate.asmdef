@@ -1,0 +1,29 @@
+{
+  "name": "YUIFramework.HotUpdate",
+  "rootNamespace": "YUIFramework.HotUpdate",
+  "references": [
+    "YUIFramework.Runtime",
+    "YooAsset",
+    "UniTask"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [
+    {
+      "name": "com.tuyoogame.yooasset",
+      "expression": "2.0.0",
+      "define": "YUIFRAMEWORK_YOOASSET"
+    },
+    {
+      "name": "com.cysharp.unitask",
+      "expression": "2.0.0",
+      "define": "YUIFRAMEWORK_UNITASK"
+    }
+  ],
+  "noEngineReferences": false
+}

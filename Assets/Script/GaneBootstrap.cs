@@ -10,7 +10,10 @@ public sealed class GameBootstrap : MonoBehaviour
 
     private async void Start()
     {
-        UIManager.Instance.Init(new ResourcesLoader());
+        if (!UIManager.Instance.IsInitialized)
+        {
+            UIManager.Instance.Initialize(new ResourcesLoader());
+        }
 
         RegisterAllUI();
 
