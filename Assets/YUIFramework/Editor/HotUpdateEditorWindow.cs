@@ -1,94 +1,154 @@
+using System;
 using UnityEditor;
 using UnityEngine;
-using YUIFramework.HotUpdate;
+using YUIFramework.Bootstrap;
 
 namespace YUIFramework.Editor
 {
-    /// <summary>
-    /// 热更调试工具（概念级）。用于在编辑器里切换运行模式、设置本地 CDN 地址，
-    /// 并快捷打开 YooAsset 自带的收集器 / 构建窗口。
-    ///
-    /// 说明：本工具只做"运行模式 + CDN 切换"，资源收集与构建仍走 YooAsset 官方窗口，
-    /// 不重造轮子。设置持久化在 EditorPrefs，编辑器加载时自动写回 <see cref="HotUpdateConfig"/>。
-    /// 注意：进入 Play 时若场景里的 GameLauncher 勾选了自身的运行模式，会以其序列化值为准。
-    /// </summary>
     public sealed class HotUpdateEditorWindow : EditorWindow
     {
-        private const string PrefPlayMode = "YUIFramework.HotUpdate.PlayMode";
-        private const string PrefUseYoo = "YUIFramework.HotUpdate.UseYooAsset";
-        private const string PrefHost = "YUIFramework.HotUpdate.HostURL";
+        private const string Prefix = "YUIFramework.Bootstrap.";
 
-        [MenuItem("Tools/YUIFramework/HotUpdate 设置")]
+        private BootstrapMode _mode;
+        private string _packageName;
+        private string _applicationId;
+        private string _channel;
+        private string _applicationVersion;
+        private string _primaryCdn;
+        private string _fallbackCdn;
+        private float _timeoutSeconds;
+        private int _maximumAttempts;
+        private int _downloadConcurrency;
+        private string _validationMessage;
+
+        [MenuItem("Tools/YUIFramework/Bootstrap Profile")]
         private static void Open()
         {
-            var window = GetWindow<HotUpdateEditorWindow>("HotUpdate");
-            window.minSize = new Vector2(360f, 260f);
+            var window = GetWindow<HotUpdateEditorWindow>("Bootstrap");
+            window.minSize = new Vector2(420f, 420f);
             window.Show();
         }
 
-        [InitializeOnLoadMethod]
-        private static void ApplyPersistedOnLoad()
+        private void OnEnable()
         {
-            HotUpdateConfig.PlayMode = (HotUpdatePlayMode)EditorPrefs.GetInt(PrefPlayMode, (int)HotUpdatePlayMode.EditorSimulate);
-            HotUpdateConfig.UseYooAsset = EditorPrefs.GetBool(PrefUseYoo, true);
-            var host = EditorPrefs.GetString(PrefHost, HotUpdateConfig.HostServerURL);
-            if (!string.IsNullOrWhiteSpace(host))
-            {
-                HotUpdateConfig.ConfigureHost(host);
-            }
+            _mode = (BootstrapMode)EditorPrefs.GetInt(
+                Prefix + "Mode",
+                (int)BootstrapMode.EditorSimulate);
+            _packageName = EditorPrefs.GetString(Prefix + "Package", "DefaultPackage");
+            _applicationId = EditorPrefs.GetString(
+                Prefix + "ApplicationId",
+                string.IsNullOrWhiteSpace(Application.identifier)
+                    ? "YUIFramework.Application"
+                    : Application.identifier);
+            _channel = EditorPrefs.GetString(Prefix + "Channel", "default");
+            _applicationVersion = EditorPrefs.GetString(
+                Prefix + "ApplicationVersion",
+                string.IsNullOrWhiteSpace(Application.version) ? "0" : Application.version);
+            _primaryCdn = EditorPrefs.GetString(
+                Prefix + "PrimaryCdn",
+                "http://127.0.0.1:8080");
+            _fallbackCdn = EditorPrefs.GetString(Prefix + "FallbackCdn", string.Empty);
+            _timeoutSeconds = EditorPrefs.GetFloat(Prefix + "Timeout", 30f);
+            _maximumAttempts = EditorPrefs.GetInt(Prefix + "Attempts", 3);
+            _downloadConcurrency = EditorPrefs.GetInt(Prefix + "Concurrency", 8);
+            Validate();
         }
 
         private void OnGUI()
         {
-            EditorGUILayout.LabelField("运行模式与 CDN", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Immutable BootstrapProfile defaults", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "EditorSimulate：资源来自工程，不走 StreamingAssets/CDN，仅开发用。\n" +
-                "Offline：仅读包内内置资源。\n" +
-                "Host：包内命中则用包内，否则从 CDN 下载。",
+                "These values are editor preferences for authoring and validation only. " +
+                "Runtime startup code must construct and inject its own immutable BootstrapProfile.",
                 MessageType.Info);
 
             EditorGUI.BeginChangeCheck();
-            var playMode = (HotUpdatePlayMode)EditorGUILayout.EnumPopup("运行模式", HotUpdateConfig.PlayMode);
-            var useYoo = EditorGUILayout.Toggle("启用 YooAsset", HotUpdateConfig.UseYooAsset);
-            var host = EditorGUILayout.TextField("CDN 主地址", HotUpdateConfig.HostServerURL);
+            _mode = (BootstrapMode)EditorGUILayout.EnumPopup("Mode", _mode);
+            _packageName = EditorGUILayout.TextField("Package", _packageName);
+            _applicationId = EditorGUILayout.TextField("Application ID", _applicationId);
+            _channel = EditorGUILayout.TextField("Channel", _channel);
+            _applicationVersion = EditorGUILayout.TextField("Application Version", _applicationVersion);
+            _primaryCdn = EditorGUILayout.TextField("Primary CDN", _primaryCdn);
+            _fallbackCdn = EditorGUILayout.TextField("Fallback CDN", _fallbackCdn);
+            _timeoutSeconds = EditorGUILayout.FloatField("Timeout (seconds)", _timeoutSeconds);
+            _maximumAttempts = EditorGUILayout.IntField("Maximum Attempts", _maximumAttempts);
+            _downloadConcurrency = EditorGUILayout.IntField("Download Concurrency", _downloadConcurrency);
             if (EditorGUI.EndChangeCheck())
             {
-                HotUpdateConfig.PlayMode = playMode;
-                HotUpdateConfig.UseYooAsset = useYoo;
-                if (!string.IsNullOrWhiteSpace(host))
-                {
-                    HotUpdateConfig.ConfigureHost(host);
-                }
-
-                EditorPrefs.SetInt(PrefPlayMode, (int)playMode);
-                EditorPrefs.SetBool(PrefUseYoo, useYoo);
-                EditorPrefs.SetString(PrefHost, host);
-            }
-
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("YooAsset 官方窗口", EditorStyles.boldLabel);
-            if (GUILayout.Button("打开 AssetBundle Collector"))
-            {
-                TryExecute("YooAsset/AssetBundle Collector");
-            }
-
-            if (GUILayout.Button("打开 AssetBundle Builder"))
-            {
-                TryExecute("YooAsset/AssetBundle Builder");
+                Save();
+                Validate();
             }
 
             EditorGUILayout.Space();
             EditorGUILayout.HelpBox(
-                "本地 CDN 联调：用 YooAsset Builder 构建后，把输出目录用任意静态服务器（如 " +
-                "`python -m http.server 8080`）托管，CDN 主地址填 http://127.0.0.1:8080 即可。",
-                MessageType.None);
+                string.IsNullOrEmpty(_validationMessage)
+                    ? "Profile values are valid."
+                    : _validationMessage,
+                string.IsNullOrEmpty(_validationMessage)
+                    ? MessageType.Info
+                    : MessageType.Error);
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("YooAsset", EditorStyles.boldLabel);
+            if (GUILayout.Button("Open AssetBundle Collector"))
+            {
+                ExecuteYooAssetMenu("YooAsset/AssetBundle Collector");
+            }
+
+            if (GUILayout.Button("Open AssetBundle Builder"))
+            {
+                ExecuteYooAssetMenu("YooAsset/AssetBundle Builder");
+            }
         }
 
-        private static void TryExecute(string menuPath)
+        private void Save()
+        {
+            EditorPrefs.SetInt(Prefix + "Mode", (int)_mode);
+            EditorPrefs.SetString(Prefix + "Package", _packageName);
+            EditorPrefs.SetString(Prefix + "ApplicationId", _applicationId);
+            EditorPrefs.SetString(Prefix + "Channel", _channel);
+            EditorPrefs.SetString(Prefix + "ApplicationVersion", _applicationVersion);
+            EditorPrefs.SetString(Prefix + "PrimaryCdn", _primaryCdn);
+            EditorPrefs.SetString(Prefix + "FallbackCdn", _fallbackCdn);
+            EditorPrefs.SetFloat(Prefix + "Timeout", _timeoutSeconds);
+            EditorPrefs.SetInt(Prefix + "Attempts", _maximumAttempts);
+            EditorPrefs.SetInt(Prefix + "Concurrency", _downloadConcurrency);
+        }
+
+        private void Validate()
+        {
+            try
+            {
+                var primary = string.IsNullOrWhiteSpace(_primaryCdn)
+                    ? null
+                    : new Uri(_primaryCdn.Trim().TrimEnd('/') + "/", UriKind.Absolute);
+                var fallback = string.IsNullOrWhiteSpace(_fallbackCdn)
+                    ? null
+                    : new Uri(_fallbackCdn.Trim().TrimEnd('/') + "/", UriKind.Absolute);
+                _ = new BootstrapProfile(
+                    _mode,
+                    new[] { new BootstrapPackageProfile(_packageName) },
+                    _applicationId,
+                    _channel,
+                    _applicationVersion,
+                    primary,
+                    fallback,
+                    TimeSpan.FromSeconds(_timeoutSeconds),
+                    _maximumAttempts,
+                    downloadConcurrency: _downloadConcurrency);
+                _validationMessage = string.Empty;
+            }
+            catch (Exception exception)
+            {
+                _validationMessage = exception.Message;
+            }
+        }
+
+        private static void ExecuteYooAssetMenu(string menuPath)
         {
             if (!EditorApplication.ExecuteMenuItem(menuPath))
             {
-                Debug.LogWarning($"[HotUpdate] 未找到菜单：{menuPath}，请确认 YooAsset 已正确安装。");
+                Debug.LogWarning($"[Bootstrap] YooAsset menu is unavailable: {menuPath}");
             }
         }
     }

@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using YUIFramework;
 
@@ -8,8 +9,15 @@ public sealed class GameBootstrap : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
-    private async void Start()
+    private void Start()
     {
+        StartAsync(destroyCancellationToken).Forget(Debug.LogException);
+    }
+
+    private async UniTask StartAsync(
+        System.Threading.CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!UIManager.Instance.IsInitialized)
         {
             UIManager.Instance.Initialize(new ResourcesLoader());
@@ -17,7 +25,8 @@ public sealed class GameBootstrap : MonoBehaviour
 
         RegisterAllUI();
 
-        await UIManager.Instance.OpenAsync<MainMenuPageContext>();
+        await UIManager.Instance.OpenAsync<MainMenuPageContext>(
+            cancellationToken: cancellationToken);
     }
 
     private static void RegisterAllUI()

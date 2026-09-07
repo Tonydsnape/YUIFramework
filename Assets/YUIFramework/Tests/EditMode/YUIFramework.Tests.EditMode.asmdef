@@ -3,6 +3,9 @@
   "rootNamespace": "YUIFramework.Tests",
   "references": [
     "YUIFramework.Runtime",
+    "YUIFramework.Bootstrap",
+    "YUIFramework.Bootstrap.YooAsset",
+    "YUIFramework.HotUpdate",
     "UniTask"
   ],
   "includePlatforms": [

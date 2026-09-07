@@ -10,11 +10,17 @@ This matrix records intent before implementation. Final Y2 names may be refined 
 | `OpenAsync<T>(object)` | UniTask/cancellation now; typed request later | `OpenHandleAsync<T>` added, object arguments retained |
 | `CloseAsync<T>()` | UniTask/cancellation and owning-service handle | Existing overload retained |
 | `UINavigator` | `IUINavigator`; command queue and transactions next | Interface and cancellation implemented; stage 3 adds FIFO queue, `IsBusy`, `BringToTopAsync<T>`, `NavigateBackAsync`, guards, and transaction rollback |
-| `IResourceLoader` | UniTask/cancellation now; leases later | Signature migrated; ownership replacement pending |
-| `ResourcesLoader` | Test/Editor compatibility only | Removed from production setup |
-| `AddressablesLoader` | Removed | No Y2 production compatibility |
-| `YooAssetLoader` | `YUIFramework.YooAsset` injected adapter | Replaced |
-| `HotUpdateManager.Instance` | Injected Bootstrap service/profile | Temporary facade only if needed |
+| `IResourceLoader` | `IUIResourceService` with `UIResourceKey` + asset/instance leases | Legacy interface and `UIManager.Initialize(IResourceLoader)` retained unchanged; stage 5 ownership is opt-in via `UIManager.Initialize(IUIResourceService)` |
+| `ResourcesLoader` | `ResourcesResourceProvider` (tests/Editor only) | Legacy loader retained; the provider obeys the same lease rules |
+| `AddressablesLoader` | Removed in stage 5 | Type, `YUIFRAMEWORK_ADDRESSABLES` version define, and docs deleted; no Y2 compatibility |
+| `YooAssetLoader` | `YooAssetBootstrapComposition.ResourceService` | Obsolete forwarding adapter retained; new `YooAssetResourceProvider` lives in `YUIFramework.Bootstrap.YooAsset` and has no manager dependency |
+| `loader.Release(key, instance)` (destroy + unref in one call) | `IUIInstanceLease.Release()` / `IUIAssetLease.Release()` | Asset and instance ownership are now separate and idempotent |
+| `HotUpdateConfig` mutable statics | Immutable `BootstrapProfile` | Obsolete properties rebuild the one legacy profile; new code owns a profile instance |
+| `HotUpdateManager.Instance` | Injected `BootstrapRunner` + `IBootstrapBackend` | Obsolete stateless singleton-shaped facade forwards to the one legacy runner |
+| `HotUpdateLauncher` static run/events | `BootstrapRunner`, `IBootstrapProgressSink`, `IBootstrapTelemetrySink` | Obsolete forwarding facade clears all callbacks at subsystem registration |
+| `RemoteServices` static URL composition | `YooAssetBootstrapBackend` endpoint-scoped resolver | Obsolete facade only; Y2 path is application/channel/version/platform/package scoped |
+| `StartupFlowTrace` static sequence | Injected structured telemetry | Obsolete log facade has no retained sequence/state |
+| resource "hot update" terminology | resource bootstrap/resource update | Code loading is the independent `IBootstrapCodeLoader` extension point |
 | String message names | Strongly typed topics/messages | String API temporarily obsolete |
 | `Task` runtime APIs | `UniTask` + `CancellationToken` | Runtime migration implemented |
 | Mutable `UIConfig` fields | Validated descriptor/config asset | Import/conversion helper |

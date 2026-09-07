@@ -34,6 +34,36 @@ All notable changes to YUIFramework are documented in this file.
   centralized raycast eligibility, reference-counted input locks, focus restoration, and
   Escape/Android Back routing.
 - Stage 4 contract and acceptance documentation (`Documentation/Y2.0/UIRootAndInput.md`).
+- Stage 5 resource ownership: strong `UIResourceKey` (package + location + type), asset leases
+  (`IUIAssetLease<T>`) and instance leases (`IUIInstanceLease`) as separate, idempotently
+  released units of ownership.
+- `IUIResourceService`/`UIResourceService` with single-flight shared loading, reference
+  counting, per-waiter cancellation, an unreferenced cache, preload, batch loading with
+  partial-failure aggregation, low-memory trimming, leak diagnostics and draining shutdown.
+- `IUIResourceProvider`, `IUINativeAssetHandle`, and `IUIResourcePackageRegistry`/
+  `UIResourcePackageRegistry` with an explicit default UI package, plus
+  `UIResourcePackageNotFoundException` and `UIResourcePackageAlreadyRegisteredException`.
+- `YooAssetResourceProvider` (production backend, injected with a `ResourcePackage` instead of
+  depending on the `HotUpdateManager` singleton) and `ResourcesResourceProvider`
+  (tests/Editor compatibility only, obeying the same lease rules).
+- `UIManager.Initialize(IUIResourceService)` and `UIManager.ResourceService`: opened contexts
+  now hold an explicit instance lease.
+- Stage 5 documentation (`Documentation/Y2.0/Resources.md`) and EditMode/PlayMode resource
+  ownership suites driven by a fake provider that needs neither YooAsset nor a network.
+- Stage 6 immutable `BootstrapProfile`, centralized `BootstrapStateGraph`, correlated
+  `BootstrapRunResult`/failure/progress/telemetry models, and injected backend, clock/delay,
+  network, disk, confirmation, code-loader, and game-entry contracts.
+- `BootstrapRunner` with deterministic EditorSimulate/Offline/Host paths, primary/fallback
+  CDN retry and bounded exponential backoff, timeout classification, download confirmation,
+  disk checks, verification gates, verified degraded fallback, per-caller cancellation,
+  equal-profile single-flight, reset, shutdown, and consecutive-run support.
+- `YUIFramework.Bootstrap.YooAsset` with the YooAsset 3.0.5 production backend,
+  application/channel/version/platform/package-scoped URL resolution, multi-package ready
+  contexts, and `YooAssetBootstrapComposition`.
+- Default no-op `IBootstrapCodeLoader`, leaving code hot update/HybridCLR unbound while
+  guaranteeing that code loading runs after resources and before business entry.
+- Stage 6 fake-backend and adapter EditMode coverage plus
+  `Documentation/Y2.0/Bootstrap.md` and `Documentation/Y2.0/Migration.md`.
 
 ### Changed
 
@@ -70,11 +100,52 @@ All notable changes to YUIFramework are documented in this file.
   descendant raycasters and keyboard focus, and Escape cannot also dispatch uGUI Cancel.
 - Hidden contexts retain sorting identity; pooled/released/faulted contexts release it.
 - Production examples no longer depend on `UIRoot.Instance` or `async void` input loops.
+- **Stage 5:** `UIManager` now reclaims orphaned instance leases on the pooled-open path.
+  `IUIObjectPool.TryGet` silently drops pooled entries whose view object was destroyed outside
+  the framework, so those entries never reached `ReleaseContextInternal`; their resource
+  reference count would otherwise never reach zero and `TrimUnused`/`HandleLowMemory` could
+  never reclaim the asset.
+- **Stage 5 (documented limitation):** because the stage 3 operation coordinator reports
+  cancellation before the queued operation body unwinds, an open cancelled after the instance
+  lease was registered (possible once a show transition is running) returns
+  `OperationCanceledException` while the lease is still held for one or more frames. The lease
+  is still returned deterministically when the body unwinds and is never double-released, but
+  the exception is not a synchronization point for resource release.
+- Resource bootstrap is now instance-owned and named independently from code hot update.
+  `YUIFramework.HotUpdate` contains only `[Obsolete]` forwarding facades; the old MonoScript
+  `.cs.meta` GUIDs remain intact, all legacy callbacks reset on subsystem registration, and
+  failures no longer become success-shaped built-in-resource results.
+- `YooAssetResourceProvider` moved from `YUIFramework.HotUpdate` to
+  `YUIFramework.Bootstrap.YooAsset` with its original `.cs.meta` GUID preserved.
+- `GameLauncher`, the resource-startup sample, editor profile tool, progress UI, and
+  `GaneBootstrap` now use explicit cancellation/error observation and contain no `async void`.
+- Review hardening validates package/version filename segments before YooAsset path use,
+  enables high verification for built-in/sandbox caches, reserves aggregate disk bytes per
+  storage scope, tracks/drains canceled YooAsset operations, marshals downloader cancellation
+  through the PlayerLoop, and reference-counts global YooAsset ownership across backends.
+- Cancellation is rechecked after code loading and game entry; Reset joins active Shutdown and
+  conditional state transitions are atomic.
+- Stage 5 resource registries freeze on first use, and resource shutdown is one shared task
+  that aggregates provider/native cleanup failures.
+- Final review fencing prevents late timed-out YooAsset operations from overwriting newer
+  manifests, accepted legacy runs are atomic with lifecycle shutdown, backend shutdown still
+  runs after reset failure, and partially destroyed package sets remain retryable.
+- Failed zero-reference releases remain tracked until shutdown, canceled loads publish their
+  shared completion only after release finalization, invalid pooled contexts are removed and
+  finalized across context types, and compatibility URL paths use the hardened segment parser.
+- Closeout hardening fences local fallback behind a zero-download proof, attempts every package
+  during teardown, generation-gates downloader progress, retries faulted legacy shutdown,
+  and makes `GameLauncher` shut down only the UIManager instance it initialized while still
+  attempting composition/backend cleanup after any earlier cleanup failure.
+- Repeated `GameLauncher.LaunchAsync` calls are single-flight, readiness is published only after
+  listeners succeed, the startup sample attempts every teardown stage, and a faulted
+  `UIResourceService` shutdown can retry retained cleanup work.
 
 ### Migration
 
 - Y2.0 permits breaking API changes behind a temporary Y1 compatibility facade.
-- YooAsset 3.x will become the only production resource backend.
-- Runtime asynchronous APIs will migrate to UniTask with `CancellationToken`.
-- Stage 4 is complete. Stage 5 YooAsset resource leases and shared-load ownership have not
-  started.
+- YooAsset 3.x is the only production resource backend as of stage 5; Addressables support
+  has been removed, and Resources is limited to tests and minimal Editor compatibility.
+- Runtime asynchronous APIs use UniTask with `CancellationToken`.
+- Stage 6 resource-update bootstrap is complete. Stage 7 pooling and memory governance has
+  not started.

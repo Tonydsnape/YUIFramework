@@ -3,6 +3,7 @@
   "rootNamespace": "YUIFramework.Editor",
   "references": [
     "YUIFramework.Runtime",
+    "YUIFramework.Bootstrap",
     "YUIFramework.HotUpdate"
   ],
   "includePlatforms": [

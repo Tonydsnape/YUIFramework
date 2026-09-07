@@ -1,58 +1,63 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
-using YUIFramework.HotUpdate;
+using YUIFramework.Bootstrap;
+using YUIFramework.Bootstrap.YooAsset;
 
 namespace YUIFramework
 {
     /// <summary>
-    /// 端到端启动示例：演示「热更启动链路 -> UIManager -> 打开首页」的完整接线。
-    /// 挂到 LoadScene 的空物体即可运行。
-    ///
-    /// 为保证在未构建任何 YooAsset 包时也能直接运行，本示例：
-    /// - 用 <see cref="HotUpdateLauncher"/> 跑一遍热更链路（无包时会优雅回退，不阻塞启动）。
-    /// - UI 部分沿用纯代码的 <see cref="CodeViewLoader"/>，便于开箱即跑。
-    ///
-    /// 生产接线：把 UIManager.Init 的 loader 换成 <c>new YooAssetLoader()</c>，
-    /// 并用 Tools/YUIFramework/HotUpdate 设置运行模式与 CDN。
+    /// Resource bootstrap sample. The historical file name is retained so existing scenes keep
+    /// their MonoScript reference; the implementation uses only the Y2 Bootstrap APIs.
     /// </summary>
-    public sealed class HotUpdateStartupSample : MonoBehaviour
+    public sealed class HotUpdateStartupSample : MonoBehaviour, IBootstrapGameEntry
     {
-        [SerializeField] private HotUpdatePlayMode playMode = HotUpdatePlayMode.EditorSimulate;
-        [SerializeField] private bool useYooAssetLoaderForUI = false;
+        [SerializeField] private BootstrapMode playMode = BootstrapMode.EditorSimulate;
+        [SerializeField] private string packageName = "DefaultPackage";
+        [SerializeField] private string channel = "default";
+        [SerializeField] private string primaryCdn = "http://127.0.0.1:8080";
+        [SerializeField] private string fallbackCdn = "";
+
+        private BootstrapRunner _runner;
+        private YooAssetBootstrapComposition _composition;
+        private UIManager _uiService;
 
         private void Start()
         {
-            RunAsync(destroyCancellationToken).Forget(Debug.LogException);
+            RunAsync(destroyCancellationToken).Forget(HandleException);
+        }
+
+        private void OnDestroy()
+        {
+            ShutdownAsync().Forget(Debug.LogException);
         }
 
         private async UniTask RunAsync(CancellationToken cancellationToken)
         {
-            StartupFlowTrace.Begin("HotUpdateStartupSample");
-
-            // 1. 配置运行模式（真机可由渠道 SDK / 编辑器工具覆盖）。
-            HotUpdateConfig.PlayMode = playMode;
-
-            // 2. 跑热更启动链路：初始化 YooAsset -> 版本 -> 清单 -> 下载差异。
-            //    无包 / 无网时返回 false 并回退，不会抛异常。
-            cancellationToken.ThrowIfCancellationRequested();
-            bool yooReady = await HotUpdateLauncher.RunAsync();
-            Debug.Log($"[HotUpdateStartupSample] 热更完成 yooReady={yooReady}");
-
-            // 3. 初始化 UI 框架。生产用 YooAssetLoader；示例默认用 CodeViewLoader 以便零资源运行。
-            IResourceLoader loader = useYooAssetLoaderForUI
-                ? new YooAssetLoader()
-                : (IResourceLoader)new CodeViewLoader();
-            if (!UIManager.Instance.IsInitialized)
+            _runner = new BootstrapRunner(
+                new YooAssetBootstrapBackend(),
+                this);
+            var result = await _runner.RunAsync(CreateProfile(), cancellationToken);
+            if (!result.IsSuccess)
             {
-                UIManager.Instance.Initialize(
-                    loader,
-                    UIRootRuntime.CreateOwned());
+                Debug.LogError(
+                    $"[BootstrapSample] Failed: {result.ErrorCode} at {result.Failure?.Operation}.");
             }
+        }
 
-            // 4. 注册并打开首页（复用现有示例页）。
-            UIManager.Instance.Register<SampleHelloPage>(new UIConfig
+        public async UniTask EnterAsync(
+            BootstrapReadyContext context,
+            CancellationToken cancellationToken)
+        {
+            _composition = YooAssetBootstrapComposition.Create(context);
+            _uiService = new UIManager();
+            await _uiService.InitializeAsync(
+                _composition.ResourceService,
+                cancellationToken: cancellationToken);
+
+            _uiService.Register<SampleHelloPage>(new UIConfig
             {
                 Id = "HelloPage",
                 PrefabKey = "SampleHelloPage",
@@ -61,11 +66,92 @@ namespace YUIFramework
                 MaxPoolSize = 1,
                 FullScreen = true,
             });
-
-            await UIManager.Instance.Navigator.PushAsync<SampleHelloPage>(
-                "Hello YUIFramework + YooAsset!",
+            await _uiService.Navigator.PushAsync<SampleHelloPage>(
+                "Hello YUIFramework Bootstrap!",
                 cancellationToken: cancellationToken);
-            StartupFlowTrace.Complete("home page pushed");
+        }
+
+        private BootstrapProfile CreateProfile()
+        {
+            var appId = string.IsNullOrWhiteSpace(Application.identifier)
+                ? "YUIFramework.Application"
+                : Application.identifier;
+            var appVersion = string.IsNullOrWhiteSpace(Application.version)
+                ? "0"
+                : Application.version;
+            return new BootstrapProfile(
+                playMode,
+                new[] { new BootstrapPackageProfile(packageName) },
+                appId,
+                channel,
+                appVersion,
+                ParseUri(primaryCdn),
+                ParseUri(fallbackCdn),
+                fallbackPolicy: BootstrapFallbackPolicy.VerifiedLocalOrBuiltin);
+        }
+
+        private async UniTask ShutdownAsync()
+        {
+            var failures = new List<Exception>();
+            if (_uiService != null && _uiService.IsInitialized)
+            {
+                try
+                {
+                    await _uiService.ShutdownAsync();
+                }
+                catch (Exception exception)
+                {
+                    failures.Add(exception);
+                }
+            }
+
+            if (_composition != null)
+            {
+                try
+                {
+                    await _composition.ShutdownResourceServiceAsync();
+                    _composition = null;
+                }
+                catch (Exception exception)
+                {
+                    failures.Add(exception);
+                }
+            }
+
+            if (_runner != null)
+            {
+                try
+                {
+                    await _runner.ShutdownAsync();
+                    _runner = null;
+                }
+                catch (Exception exception)
+                {
+                    failures.Add(exception);
+                }
+            }
+
+            if (failures.Count > 0)
+            {
+                throw new AggregateException(
+                    "Bootstrap sample shutdown did not complete cleanly.",
+                    failures);
+            }
+        }
+
+        private static Uri ParseUri(string value)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? null
+                : new Uri(value.Trim().TrimEnd('/') + "/", UriKind.Absolute);
+        }
+
+        private static void HandleException(Exception exception)
+        {
+            if (!(exception is OperationCanceledException))
+            {
+                Debug.LogException(exception);
+            }
         }
     }
 }

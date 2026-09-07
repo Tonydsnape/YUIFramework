@@ -1,95 +1,125 @@
-using UnityEngine;
+using System;
+using YUIFramework.Bootstrap;
+using YUIFramework.Bootstrap.YooAsset;
 
 namespace YUIFramework.HotUpdate
 {
-    /// <summary>
-    /// 热更配置（概念性）。集中管理包名、运行模式、CDN 地址与下载参数。
-    /// 参考项目里 channel/environment/marker 等多环境矩阵在示例中一律省略，
-    /// CDN 确定后只需改这里或用编辑器工具 <c>Tools/YUIFramework/HotUpdate</c> 切换。
-    /// </summary>
+    [Obsolete("Use an immutable YUIFramework.Bootstrap.BootstrapProfile.")]
     public static class HotUpdateConfig
     {
-        /// <summary>YooAsset 资源包名，需与打包时的 Package 名一致。</summary>
         public const string DefaultPackageName = "DefaultPackage";
 
-        /// <summary>
-        /// 当前运行模式。默认编辑器模拟；真机由启动流程 / 编辑器工具覆盖。
-        /// </summary>
-        public static HotUpdatePlayMode PlayMode = HotUpdatePlayMode.EditorSimulate;
-
-        /// <summary>是否启用 YooAsset。false 时 <see cref="YooAssetLoader"/> 全部回退 Resources。</summary>
-        public static bool UseYooAsset = true;
-
-        /// <summary>CDN 主地址（联机模式）。示例默认指向本地 CDN 占位。</summary>
-        public static string HostServerURL = "http://127.0.0.1:8080";
-
-        /// <summary>CDN 备用地址。留空则回退到主地址。</summary>
-        public static string FallbackHostServerURL = "http://127.0.0.1:8080";
-
-        /// <summary>下载并发数。</summary>
-        public static int DownloadingMaxNumber = 10;
-
-        /// <summary>单文件下载失败重试次数。</summary>
-        public static int FailedTryAgain = 3;
-
-        /// <summary>启动期请求远端版本的超时（秒）。弱网/无网超时后回退内置清单。</summary>
-        public static int StartupVersionTimeout = 15;
-
-        /// <summary>加载资源清单的超时（秒）。</summary>
-        public static int ManifestLoadTimeout = 60;
-
-        /// <summary>是否在远端 URL 中插入平台目录（{host}/{platform}/{file}），匹配 YooAsset 常见 CDN 布局。</summary>
-        public static bool AppendPlatformSegment = true;
-
-        /// <summary>配置 CDN 地址。fallback 为空时与 main 相同。</summary>
-        public static void ConfigureHost(string main, string fallback = null)
+        public static HotUpdatePlayMode PlayMode
         {
-            if (!string.IsNullOrWhiteSpace(main))
-            {
-                HostServerURL = main.Trim().TrimEnd('/');
-            }
-
-            FallbackHostServerURL = string.IsNullOrWhiteSpace(fallback)
-                ? HostServerURL
-                : fallback.Trim().TrimEnd('/');
+            get => (HotUpdatePlayMode)LegacyBootstrapRuntime.Current.Profile.Mode;
+            set => LegacyBootstrapRuntime.Current.SetMode((BootstrapMode)value);
         }
 
-        /// <summary>当前平台名（用于 CDN 目录）。</summary>
-        public static string PlatformName
+        public static bool UseYooAsset
         {
-            get
+            get => true;
+            set
             {
-                switch (Application.platform)
+                if (!value)
                 {
-                    case RuntimePlatform.Android:
-                        return "Android";
-                    case RuntimePlatform.IPhonePlayer:
-                        return "IOS";
-                    case RuntimePlatform.WebGLPlayer:
-                        return "WebGL";
-                    default:
-                        return "PC";
+                    throw new NotSupportedException(
+                        "Y2 bootstrap uses YooAsset as its only production resource backend.");
                 }
             }
         }
 
-        /// <summary>解析某个资源文件的远端主地址。</summary>
+        public static string HostServerURL
+        {
+            get => LegacyBootstrapRuntime.Current.Profile.PrimaryCdn?.AbsoluteUri ?? string.Empty;
+            set => ConfigureHost(value, FallbackHostServerURL);
+        }
+
+        public static string FallbackHostServerURL
+        {
+            get => LegacyBootstrapRuntime.Current.Profile.FallbackCdn?.AbsoluteUri ?? string.Empty;
+            set => ConfigureHost(HostServerURL, value);
+        }
+
+        public static int DownloadingMaxNumber
+        {
+            get => LegacyBootstrapRuntime.Current.Profile.DownloadConcurrency;
+            set => LegacyBootstrapRuntime.Current.SetDownloadConcurrency(value);
+        }
+
+        public static int FailedTryAgain
+        {
+            get => LegacyBootstrapRuntime.Current.Profile.MaximumAttempts - 1;
+            set => LegacyBootstrapRuntime.Current.SetMaximumAttempts(checked(value + 1));
+        }
+
+        public static int StartupVersionTimeout
+        {
+            get => (int)Math.Ceiling(
+                LegacyBootstrapRuntime.Current.Profile.OperationTimeout.TotalSeconds);
+            set => LegacyBootstrapRuntime.Current.SetTimeout(TimeSpan.FromSeconds(value));
+        }
+
+        public static int ManifestLoadTimeout
+        {
+            get => StartupVersionTimeout;
+            set => StartupVersionTimeout = value;
+        }
+
+        public static bool AppendPlatformSegment
+        {
+            get => true;
+            set
+            {
+                if (!value)
+                {
+                    throw new NotSupportedException(
+                        "Y2 bootstrap always scopes CDN paths by application, channel, version, platform, and package.");
+                }
+            }
+        }
+
+        public static string PlatformName =>
+            UnityBootstrapRuntimeEnvironment.Instance.PlatformName;
+
+        public static void ConfigureHost(string main, string fallback = null)
+        {
+            if (string.IsNullOrWhiteSpace(main))
+            {
+                throw new ArgumentException("Primary CDN must not be empty.", nameof(main));
+            }
+
+            var primaryUri = new Uri(main.Trim().TrimEnd('/') + "/", UriKind.Absolute);
+            var fallbackUri = string.IsNullOrWhiteSpace(fallback)
+                ? null
+                : new Uri(fallback.Trim().TrimEnd('/') + "/", UriKind.Absolute);
+            LegacyBootstrapRuntime.Current.SetCdn(primaryUri, fallbackUri);
+        }
+
         public static string GetRemoteMainURL(string fileName)
         {
-            return $"{HostServerURL}/{GetRemoteRelativePath(fileName)}";
+            var profile = LegacyBootstrapRuntime.Current.Profile;
+            return YooAssetBootstrapUrl.BuildCdnUrl(
+                profile,
+                profile.PackageName,
+                PlatformName,
+                fileName,
+                BootstrapEndpoint.Primary);
         }
 
-        /// <summary>解析某个资源文件的远端备用地址。</summary>
         public static string GetRemoteFallbackURL(string fileName)
         {
-            return $"{FallbackHostServerURL}/{GetRemoteRelativePath(fileName)}";
-        }
+            var profile = LegacyBootstrapRuntime.Current.Profile;
+            if (profile.FallbackCdn == null)
+            {
+                return GetRemoteMainURL(fileName);
+            }
 
-        private static string GetRemoteRelativePath(string fileName)
-        {
-            return AppendPlatformSegment
-                ? $"{PlatformName}/{DefaultPackageName}/{fileName}"
-                : $"{DefaultPackageName}/{fileName}";
+            return YooAssetBootstrapUrl.BuildCdnUrl(
+                profile,
+                profile.PackageName,
+                PlatformName,
+                fileName,
+                BootstrapEndpoint.Fallback);
         }
     }
 }

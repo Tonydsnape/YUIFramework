@@ -130,3 +130,21 @@ The following remain Y1 compatibility APIs:
 - string-based messages
 
 New code should start from `Y2ServiceBootstrap` and use an owned `IUIService`.
+
+## Resource bootstrap
+
+Stage 6 introduces the instance-owned `BootstrapRunner` and immutable `BootstrapProfile`.
+The runner owns one centralized state graph from `Idle` through package/version/manifest,
+download and verification to `ResourcesReady`, optional `LoadingCodeExtension`,
+`EnteringGame`, and `Completed`. `Failed`, `Canceled`, `Resetting`, and `ShuttingDown` are
+explicit outcomes/states.
+
+`IBootstrapBackend` is independent of YooAsset. Network, clock/delay, disk, confirmation,
+progress, telemetry, code loading, and game entry are injected contracts. Equal concurrent
+profiles share one run; a different profile is rejected; caller cancellation cancels only
+that wait. Reset and shutdown cancel and drain the underlying run.
+
+`BootstrapRunResult.IsSuccess` requires `Completed` plus a non-null verified
+`BootstrapReadyContext`. Business entry is impossible before resource verification and code
+loader success. A verified local/built-in fallback is marked degraded and never represented
+as the latest remote version. See [Bootstrap.md](Bootstrap.md).

@@ -1,6 +1,6 @@
 # YUIFramework
 
-YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架 + P2 栈式页面导航 + P3 资源加载体系增强 + P4 UI 对象池缓存增强 + P5 UI 消息中心 + P6 轻量虚拟列表 + P7 轻量转场动画 + P8 轻量 MVVM / 数据绑定基础层 + P9 YooAsset 热更 / 启动链路**。
+YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓库实现了 **P1 核心骨架 + P2 栈式页面导航 + P3 资源加载体系增强 + P4 UI 对象池缓存增强 + P5 UI 消息中心 + P6 轻量虚拟列表 + P7 轻量转场动画 + P8 轻量 MVVM / 数据绑定基础层 + P9 YooAsset 资源 Bootstrap**。
 
 设计灵感来自：
 - 原神 `MoleMole.UIManager`（Context / Layer / 配置驱动）
@@ -11,12 +11,15 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 
 ## Y2.0 改造基线
 
-Y2.0 正在按阶段建立商用基线。阶段 0 与阶段 1 已完成：现有行为已有自动化基线，核心运行时已提供可注入 `IUIService`、显式 Initialize/Shutdown，以及 UniTask/CancellationToken 异步契约。
+Y2.0 正在按阶段建立商用基线。阶段 0 到阶段 6 已完成：除阶段 0-5 的 UI 生命周期、并发、输入和资源所有权外，现已提供不可变 Bootstrap Profile、集中状态图、三运行模式、弱网重试/超时、主备 CDN、验证回退、磁盘/确认门禁、结构化进度与实例化 Reset/Shutdown。
 
 - 基线说明：[`Documentation/Y2.0/Baseline.md`](Documentation/Y2.0/Baseline.md)
 - 分阶段路线：[`Documentation/Y2.0/Roadmap.md`](Documentation/Y2.0/Roadmap.md)
 - API 迁移矩阵：[`Documentation/Y2.0/ApiMigrationMatrix.md`](Documentation/Y2.0/ApiMigrationMatrix.md)
 - Y2 运行时契约：[`Documentation/Y2.0/Contracts.md`](Documentation/Y2.0/Contracts.md)
+- 资源所有权体系：[`Documentation/Y2.0/Resources.md`](Documentation/Y2.0/Resources.md)
+- 资源 Bootstrap：[`Documentation/Y2.0/Bootstrap.md`](Documentation/Y2.0/Bootstrap.md)
+- Bootstrap 迁移：[`Documentation/Y2.0/Migration.md`](Documentation/Y2.0/Migration.md)
 - 测试说明：[`Documentation/Y2.0/Testing.md`](Documentation/Y2.0/Testing.md)
 - 变更记录：[`CHANGELOG.md`](CHANGELOG.md)
 
@@ -25,19 +28,20 @@ Y2.0 正在按阶段建立商用基线。阶段 0 与阶段 1 已完成：现有
 当前实现包含：
 - P1 核心骨架（✅）
 - P2 栈式页面导航 `UINavigator`（✅）
-- P3 资源加载体系增强（✅，Resources + 可选 Addressables）
+- P3 资源加载体系增强（✅，Resources；Y2.0 阶段 5 起生产后端为 YooAsset）
 - P4 UI 对象池 / 缓存增强（✅）
 - P5 UI 消息中心 / 事件总线（✅）
 - P6 虚拟列表 / 大量 UI 元素优化（✅）
 - P7 UI 转场动画 / 页面过渡系统（✅）
 - P8 MVVM / 数据绑定基础层（✅）
-- P9 YooAsset 热更 / 启动链路（✅，YooAsset 3.x + UniTask）
+- P9 YooAsset 资源 Bootstrap（✅，Y2.0 阶段 6；YooAsset 3.0.5 + UniTask）
 
 核心能力：
 - 分层系统（`UILayer` + 每层独立 Canvas）
 - Context 生命周期（`OnInit -> OnShow -> OnHide -> OnClose -> OnDestroy`）
 - 资源加载抽象（`IResourceLoader` + `ResourcesLoader`）
-- 可选 Addressables 接入（`AddressablesLoader`，按包版本自动启用）
+- 资源所有权体系（`IUIResourceService` + `UIResourceKey` + 资源/实例租约，Y2.0 阶段 5）
+- 资源更新 Bootstrap（不可变 Profile + 状态图 + `BootstrapRunner`，Y2.0 阶段 6）
 - 核心调度器（`UIManager`）
 - Page 栈导航（`Push / Pop / Replace / Back`）
 - UI 缓存池（`CacheOnClose` + `MaxPoolSize`）
@@ -114,15 +118,23 @@ P7 生命周期语义：
 最小示例：
 
 ```csharp
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using YUIFramework;
 
 public class HelloUIBootstrap : MonoBehaviour
 {
-    private async void Start()
+    private void Start()
     {
-        var uiManager = UIManager.Instance;
-        uiManager.Init(new CodeViewLoader());
+        RunAsync(destroyCancellationToken).Forget(Debug.LogException);
+    }
+
+    private async UniTask RunAsync(System.Threading.CancellationToken cancellationToken)
+    {
+        var uiManager = new UIManager();
+        await uiManager.InitializeAsync(
+            new CodeViewLoader(),
+            cancellationToken: cancellationToken);
         uiManager.Register<SampleHelloPage>(new UIConfig
         {
             Id = "HelloPage",
@@ -133,7 +145,9 @@ public class HelloUIBootstrap : MonoBehaviour
             FullScreen = true,
         });
 
-        await uiManager.Navigator.PushAsync<SampleHelloPage>("Hello YUIFramework!");
+        await uiManager.Navigator.PushAsync<SampleHelloPage>(
+            "Hello YUIFramework!",
+            cancellationToken: cancellationToken);
     }
 }
 ```
@@ -172,18 +186,22 @@ Resources 资源文件路径示例：
 Assets/Resources/UI/Pages/MainMenuPage.prefab
 ```
 
-### 使用 AddressablesLoader（仅安装 Addressables 后）
+### 生产资源后端：YooAsset（Y2.0 阶段 5）
+
+Y2.0 阶段 5 起，YooAsset 3.x 是唯一的生产资源后端，Addressables 支持已移除
+（`AddressablesLoader` 与 `YUIFRAMEWORK_ADDRESSABLES` 已删除），Resources 仅保留用于测试与
+最小化 Editor 兼容。
 
 ```csharp
-#if YUIFRAMEWORK_ADDRESSABLES
-UIManager.Instance.Init(new AddressablesLoader());
-#endif
+var registry = new UIResourcePackageRegistry();
+registry.Register(
+    new YUIFramework.Bootstrap.YooAsset.YooAssetResourceProvider(package),
+    isDefault: true);
+UIManager.Instance.Initialize(new UIResourceService(registry));
 ```
 
-说明：
-- Addressables 包安装后，`YUIFRAMEWORK_ADDRESSABLES` 会通过 asmdef 的 versionDefines 自动生效。
-- 未安装 Addressables 时，`AddressablesLoader` 不会参与编译，不影响项目构建。
-- 推荐将 UI Prefab Address 设为与 Resources 同风格的 key（如 `UI/Pages/MainMenuPage`）。
+资源租约与实例租约分离、同 key 并发共享加载、逐调用方取消、预加载、批量部分失败与泄漏诊断
+详见 [`Documentation/Y2.0/Resources.md`](Documentation/Y2.0/Resources.md)。
 
 ### 如何避免错误路径
 
@@ -193,14 +211,14 @@ UIManager.Instance.Init(new AddressablesLoader());
 
 `ResourcesLoader` 会对常见错误做规范化与日志提示，但建议在配置阶段直接使用逻辑 key。
 
-### Resources vs Addressables
+### Resources vs YooAsset
 
-| 对比项 | ResourcesLoader | AddressablesLoader |
+| 对比项 | ResourcesResourceProvider | YooAssetResourceProvider |
 |---|---|---|
-| 是否开箱可用 | ✅ Unity 内置 | ⚠️ 需安装 `com.unity.addressables` |
-| Key 约定 | `UI/Pages/MainMenuPage` | Address（建议同上） |
-| 包体与更新策略 | 简单，适合小中型项目 | 更灵活，适合中大型项目 |
-| 句柄管理 | 无需额外句柄 | 内置 handle + 引用计数释放 |
+| 用途 | 仅测试 / 最小 Editor 兼容 | 生产唯一后端 |
+| Key 约定 | `UI/Pages/MainMenuPage` | package + location + type |
+| 是否支持资源更新 | ❌ | ✅ |
+| 句柄管理 | 无底层句柄 | 底层句柄 + 引用计数租约 |
 
 ## P4 对象池 / UI 缓存增强
 
@@ -371,72 +389,85 @@ protected override void HandleInit()
 - 入池对象不会触发 `OnDestroy`，因此 ViewModel 与绑定会保留。
 - 若业务要求隐藏即解绑，可在 `HandleHide` 手动调用 `ClearBindings()` / `ClearViewModel()`。
 
-## P9 YooAsset 热更 + 启动链路
+## P9 / Y2 阶段 6：YooAsset 资源 Bootstrap
 
-P9 新增可选热更层 `Runtime/HotUpdate`（独立程序集 `YUIFramework.HotUpdate`），把 **YooAsset 3.x** 资源系统与启动链路接入框架。UI 核心程序集保持零第三方依赖，热更作为**可插拔层**存在。
+阶段 6 将资源更新与代码热更新彻底分名：`BootstrapRunner` 只保证 YooAsset 资源就绪；
+`IBootstrapCodeLoader` 是资源就绪后的可选扩展点，默认 no-op，本阶段不依赖 HybridCLR。
 
-> 依赖：`com.tuyoogame.yooasset` 3.0.5（已在 manifest）+ `com.cysharp.unitask`。
+> 依赖：`com.tuyoogame.yooasset` 3.0.5 + `com.cysharp.unitask`。
 
-### 模块组成
+### 单向程序集边界
+
+```text
+YUIFramework.Runtime
+  -> YUIFramework.Bootstrap
+  -> YUIFramework.Bootstrap.YooAsset
+  -> YUIFramework.HotUpdate（仅 Obsolete 兼容 facade）
+```
 
 | 类型 | 作用 |
 |---|---|
-| `HotUpdatePlayMode` | 运行模式枚举：`EditorSimulate / Offline / Host` |
-| `HotUpdateConfig` | 包名、模式、CDN 主备地址、下载并发/重试/超时 |
-| `RemoteServices` | YooAsset 远端地址解析（`IRemoteService.GetRemoteUrls`），支持内置清单回退 |
-| `HotUpdateManager` | 核心：初始化包 → 请求版本 → 更新清单 → 下载差异 → 加载资源 |
-| `HotUpdateLauncher` | 启动期热更入口，暴露进度/状态/体积/确认事件 |
-| `StartupFlowTrace` | 结构化启动诊断（带序号与耗时） |
-| `YooAssetLoader` | `IResourceLoader` 实现，桥接 `UIManager`，命中失败回退 Resources |
-| `HotUpdateProgressUI` | uGUI 进度条组件，订阅 Launcher 事件自动显示 |
-| `GameLauncher` | 串联「设模式 → 热更(Loading) → UIManager → 业务回调」 |
+| `BootstrapProfile` | 不可变且全面验证的模式/package/app/channel/version/CDN/超时/重试/磁盘/确认策略 |
+| `BootstrapStateGraph` | 唯一合法状态边；未验证资源绝不进入业务 |
+| `BootstrapRunner` | single-flight、逐调用方取消、重试/超时、fallback、Reset/Shutdown |
+| `IBootstrapBackend` | 可 fake 的纯后端契约 |
+| `YooAssetBootstrapBackend` | YooAsset 3.0.5 生产适配器，检查所有 operation status/error |
+| `YooAssetBootstrapComposition` | 把 ready packages 组合成多 package `UIResourceService` |
+| `IBootstrapCodeLoader` | ResourcesReady 后、EnteringGame 前的可选代码扩展 |
+| `IBootstrapProgressSink` / `IBootstrapTelemetrySink` | 带 RunId 的结构化进度与诊断 |
 
-### 启动链路
+### 启动门禁
 
 ```text
-LoadScene → GameLauncher/Bootstrap
-        → HotUpdateLauncher.RunAsync()   // 初始化→版本→清单→下载，带 Loading UI
-        → UIManager.Init(new YooAssetLoader())
-        → 注册并打开首页
+Idle -> InitializingPackage -> RequestingVersion -> ActivatingManifest
+     -> CalculatingDownload -> [Confirm -> Disk -> Download -> Verify]
+     -> ResourcesReady -> LoadingCodeExtension -> EnteringGame -> Completed
 ```
 
-### 与 UI 框架集成
+`EditorSimulate` 仅允许 Editor 且不联网；`Offline` 只读内置文件；`Host` 才走完整远端流程。
+主 CDN 按有界指数退避重试后才切备用 CDN。仅 Profile 允许且本地/内置 manifest 已验证时
+才可 fallback；结果显式标记 `Degraded`，绝不伪装为“已更新到最新”。
 
-只需把 `UIManager.Init` 的 loader 换成 `YooAssetLoader` 即可用 YooAsset 加载 UI 预制体：
+### 最小生产接线
 
 ```csharp
-UIManager.Instance.Init(new YooAssetLoader());
-UIManager.Instance.Register<MainMenuPageContext>(new UIConfig
-{
-    Id = "MainMenuPage",
-    PrefabKey = "UI/Pages/MainMenuPage", // 与 YooAsset 收集器的资源地址一致
-    Layer = UILayer.Normal,
-});
-await UIManager.Instance.Navigator.PushAsync<MainMenuPageContext>();
+var profile = new BootstrapProfile(
+    BootstrapMode.Host,
+    new[] { new BootstrapPackageProfile("DefaultPackage") },
+    "com.example.game",
+    "release",
+    Application.version,
+    new Uri("https://cdn.example.com/content/"),
+    new Uri("https://backup.example.com/content/"));
+
+var runner = new BootstrapRunner(
+    new YooAssetBootstrapBackend(),
+    gameEntry,
+    progress: progressSink,
+    telemetry: telemetrySink);
+
+var result = await runner.RunAsync(profile, cancellationToken);
 ```
 
-`YooAssetLoader` 优先走 YooAsset（可热更），未就绪或清单未收录时自动回退 `Resources`，保证示例在未构建资源包时仍可运行。
+`IBootstrapGameEntry.EnterAsync` 中使用：
 
-### 运行模式与本地联调
+```csharp
+var composition = YooAssetBootstrapComposition.Create(readyContext);
+await ui.InitializeAsync(
+    composition.ResourceService,
+    cancellationToken: cancellationToken);
+```
 
-编辑器菜单 `Tools/YUIFramework/HotUpdate 设置`：
-- 切换运行模式（EditorSimulate / Offline / Host）
-- 设置本地 CDN 地址
-- 快捷打开 YooAsset 官方 Collector / Builder 窗口
+关闭顺序固定为 UI → `composition.ShutdownResourceServiceAsync()` → `runner.ShutdownAsync()`，
+确保 UI 租约和 YooAsset handle 先释放，再销毁 package。
 
-本地 CDN 联调：用 YooAsset Builder 构建后，把输出目录用静态服务器（如 `python -m http.server 8080`）托管，Host 地址填 `http://127.0.0.1:8080`。
+编辑器菜单 `Tools/YUIFramework/Bootstrap Profile` 只保存/验证创作默认值，不向运行时写
+static 配置。`Examples/HotUpdateStartupSample.cs` 因保留旧 MonoScript 引用而保留文件名，
+内部已完全改用实例化 Y2 Bootstrap API。
 
-### 端到端示例
-
-`Examples/HotUpdateStartupSample.cs` 演示完整链路：跑热更（无包时优雅回退）→ 初始化 UIManager → 打开首页。挂到空物体即可运行。
-
-### 与参考框架的差异（有意裁剪）
-
-本实现从生产级热更框架吸取骨架，但面向**示例项目**做了大幅裁剪与优化：
-- 拆分单体 `ResourceManager` 为 `Config + Manager + Loader` 三块。
-- 热更独立成可选程序集，UI 核心零第三方依赖。
-- 运行模式用单枚举 + 编辑器工具，替代 channel/environment/marker 多环境矩阵。
-- **不含** DurableSeed 持久化、Atlas 提供器、Prefetch 调度、内容寻址多环境 Profile 等业务专用逻辑。
+旧 `HotUpdateConfig/Manager/Launcher/RemoteServices/StartupFlowTrace/YooAssetLoader` 均为
+`[Obsolete]` 转发 facade；原 GameLauncher/ProgressUI 等 `.cs.meta` GUID 保留，且静态事件在
+`SubsystemRegistration` 全量清理。
 
 ### YooAsset 2.x → 3.0.5 原生 API 说明
 
@@ -463,15 +494,15 @@ await UIManager.Instance.Navigator.PushAsync<MainMenuPageContext>();
 
 - P1 核心骨架（✅）
 - P2 栈式导航 `UINavigator`（✅）
-- P3 资源加载体系增强（✅，Resources + 可选 Addressables）
+- P3 资源加载体系增强（✅，Resources；Y2.0 阶段 5 起生产后端为 YooAsset）
 - P4 对象池 / UI 缓存增强（✅）
 - P5 消息中心（✅）
 - P6 虚拟列表 / 大量 UI 元素优化（✅）
 - P7 转场动画（✅）
 - P8 MVVM / 数据绑定（✅）
-- P9 YooAsset 热更 + 启动链路（✅，YooAsset 3.x + UniTask）
+- P9 YooAsset 资源 Bootstrap（✅，Y2.0 阶段 6）
 - P10 Editor 工具 / 代码生成 / 测试完善（⏳）
 
 ---
 
-当前仓库已落地 P1 ~ P9，P10 及后续模块待实现。
+当前仓库已落地 P1 ~ P9；Y2.0 阶段 6 已完成，阶段 7 尚未开始。

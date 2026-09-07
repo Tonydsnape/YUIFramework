@@ -2,7 +2,7 @@
 
 Y2.0 uses one development line and advances through strict stage gates. Only one stage is implemented at a time. Code, tests, documentation, and acceptance must be complete before the next stage begins.
 
-**Progress: stage 4 complete (5 of 17 stages). Stage 5 has not started.**
+**Progress: stage 6 complete (7 of 17 stages). Stage 7 has not started.**
 
 ## Fixed decisions
 
@@ -24,8 +24,8 @@ Y2.0 uses one development line and advances through strict stage gates. Only one
 | 2 (complete) | Lifecycle state machine | Every legal/illegal transition, cancellation point, failure rollback, and pooled path is deterministic |
 | 3 (complete) | Concurrency and navigation transactions | Rapid open/close/navigation cannot duplicate instances or desynchronize the stack |
 | 4 (complete) | UIRoot, layers, sorting, and input | Root/EventSystem ownership is explicit; sorting is reusable; modal input and nested locks are correct |
-| 5 | YooAsset ownership model | Shared loads, leases, cancellation, release, preload, multi-package use, and leak reporting pass tests |
-| 6 | Resource-update bootstrap | EditorSimulate/Offline/Host, weak network, fallback, reset, and update failures have deterministic outcomes |
+| 5 (complete) | YooAsset ownership model | Shared loads, leases, cancellation, release, preload, multi-package use, and leak reporting pass tests |
+| 6 (complete) | Resource-update bootstrap | EditorSimulate/Offline/Host, weak network, fallback, reset, and update failures have deterministic outcomes |
 | 7 | Pooling and memory governance | Preload, capacity, LRU, scopes, low-memory eviction, and lease release are complete |
 | 8 | Interruptible transitions and visibility | Show/hide can be canceled or reversed without transform, alpha, input, or navigation residue |
 | 9 | Messaging and MVVM lifecycle | Typed messages, scoped subscriptions, commands, common bindings, cancellation, and pooling are safe |

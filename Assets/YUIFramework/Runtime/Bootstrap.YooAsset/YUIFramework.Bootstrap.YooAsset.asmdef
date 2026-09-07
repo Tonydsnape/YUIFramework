@@ -1,10 +1,9 @@
 {
-  "name": "YUIFramework.HotUpdate",
-  "rootNamespace": "YUIFramework.HotUpdate",
+  "name": "YUIFramework.Bootstrap.YooAsset",
+  "rootNamespace": "YUIFramework.Bootstrap.YooAsset",
   "references": [
     "YUIFramework.Runtime",
     "YUIFramework.Bootstrap",
-    "YUIFramework.Bootstrap.YooAsset",
     "YooAsset",
     "UniTask"
   ],

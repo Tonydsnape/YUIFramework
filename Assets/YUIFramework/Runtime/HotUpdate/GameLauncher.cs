@@ -1,88 +1,238 @@
+using System;
+using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Events;
+using YUIFramework.Bootstrap;
+using YUIFramework.Bootstrap.YooAsset;
 
 namespace YUIFramework.HotUpdate
 {
-    /// <summary>
-    /// 示例启动器：串联「设置运行模式 -> 启动热更(带 Loading UI) -> 初始化 UIManager -> 通知业务」。
-    /// 挂在 LoadScene 的空物体上即可。业务层通过 <see cref="onResourcesReady"/> 注册并打开首页，
-    /// 从而把热更资源系统与现有 UI 框架解耦。
-    /// </summary>
-    public sealed class GameLauncher : MonoBehaviour
+    [Obsolete("Compose and own BootstrapRunner explicitly in new startup code.")]
+    public sealed class GameLauncher : MonoBehaviour, IBootstrapGameEntry
     {
-        [Header("运行模式")]
-        [SerializeField] private HotUpdatePlayMode playMode = HotUpdatePlayMode.EditorSimulate;
-        [SerializeField] private bool useYooAsset = true;
+        [Header("Bootstrap profile")]
+        [SerializeField] private BootstrapMode playMode = BootstrapMode.EditorSimulate;
+        [SerializeField] private string packageName = "DefaultPackage";
+        [SerializeField] private string applicationId = "YUIFramework.Application";
+        [SerializeField] private string channel = "default";
+        [SerializeField] private string applicationVersion = "0";
 
-        [Header("CDN（仅 Host 模式）")]
+        [Header("CDN (Host only)")]
         [SerializeField] private string hostServerURL = "http://127.0.0.1:8080";
         [SerializeField] private string fallbackServerURL = "";
 
-        [Header("流程")]
-        [Tooltip("热更完成后是否自动初始化 UIManager")]
+        [Header("Policy")]
+        [SerializeField] private float timeoutSeconds = 30f;
+        [SerializeField] private int maximumAttempts = 3;
+        [SerializeField] private float initialRetryBackoffSeconds = 0.25f;
+        [SerializeField] private float maximumRetryBackoffSeconds = 4f;
+        [SerializeField] private int downloadConcurrency = 8;
+        [SerializeField] private long diskSafetyMarginBytes = 67108864;
+        [SerializeField] private bool allowVerifiedFallback = true;
+        [SerializeField] private bool requireDownloadConfirmation = true;
+
+        [Header("Flow")]
         [SerializeField] private bool autoInitUIManager = true;
-
-        [Tooltip("热更期间显示、完成后隐藏的 Loading 根节点（可空）")]
         [SerializeField] private GameObject loadingRoot;
-
-        [Header("就绪回调")]
-        [Tooltip("资源与 UIManager 就绪后触发；业务层在此注册并打开首页")]
+        [SerializeField] private BootstrapProgressUI progressUI;
         [SerializeField] private UnityEvent onResourcesReady;
 
-        /// <summary>资源系统是否已就绪。</summary>
+        private BootstrapRunner _runner;
+        private YooAssetBootstrapComposition _composition;
+        private bool _ownsUIManager;
+        private readonly object _launchGate = new object();
+        private Task _launchTask;
+
         public bool IsReady { get; private set; }
 
         private void Start()
         {
-            LaunchAsync(destroyCancellationToken).Forget(Debug.LogException);
+            LaunchAsync(destroyCancellationToken).Forget(HandleLaunchException);
         }
 
-        /// <summary>执行完整启动链路。可在业务侧手动调用（例如重试）。</summary>
-        public async UniTask LaunchAsync(CancellationToken cancellationToken = default)
+        private void OnDestroy()
         {
-            StartupFlowTrace.Begin($"GameLauncher mode={playMode}");
-            ApplyConfig();
+            ShutdownAsync().Forget(Debug.LogException);
+        }
 
+        public UniTask LaunchAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Task task;
+            lock (_launchGate)
+            {
+                if (_composition != null || IsReady)
+                {
+                    throw new InvalidOperationException(
+                        "GameLauncher is already ready. Shut it down before launching again.");
+                }
+
+                if (_launchTask == null || _launchTask.IsCompleted)
+                {
+                    if (_runner == null)
+                    {
+                        _runner = new BootstrapRunner(
+                            new YooAssetBootstrapBackend(),
+                            this,
+                            progress: progressUI);
+                    }
+
+                    _launchTask = LaunchCoreAsync(CreateProfile()).AsTask();
+                }
+
+                task = _launchTask;
+            }
+
+            return AwaitLaunchAsync(task, cancellationToken);
+        }
+
+        private async UniTask LaunchCoreAsync(BootstrapProfile profile)
+        {
+            IsReady = false;
             if (loadingRoot != null)
             {
                 loadingRoot.SetActive(true);
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
-            await HotUpdateLauncher.RunAsync();
-
-            if (autoInitUIManager)
+            var result = await _runner.RunAsync(profile);
+            if (!result.IsSuccess)
             {
-                if (!UIManager.Instance.IsInitialized)
-                {
-                    UIManager.Instance.Initialize(
-                        new YooAssetLoader(),
-                        UIRootRuntime.CreateOwned());
-                }
+                Debug.LogError(
+                    $"[Bootstrap] Startup failed: {result.ErrorCode} at {result.Failure?.Operation}.");
+            }
+        }
 
-                StartupFlowTrace.Step("game-launcher.uimanager-ready");
+        public UniTask EnterAsync(
+            BootstrapReadyContext context,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_composition != null)
+            {
+                throw new InvalidOperationException(
+                    "Resource composition already exists. Reset before launching again.");
             }
 
-            IsReady = true;
-            onResourcesReady?.Invoke();
+            _composition = YooAssetBootstrapComposition.Create(context);
+            if (autoInitUIManager && !UIManager.Instance.IsInitialized)
+            {
+                UIManager.Instance.Initialize(
+                    _composition.ResourceService,
+                    UIRootRuntime.CreateOwned());
+                _ownsUIManager = true;
+            }
 
+            onResourcesReady?.Invoke();
+            IsReady = true;
             if (loadingRoot != null)
             {
                 loadingRoot.SetActive(false);
             }
 
-            StartupFlowTrace.Complete($"yooReady={HotUpdateManager.Instance.IsYooAssetReady}");
+            return UniTask.CompletedTask;
         }
 
-        private void ApplyConfig()
+        private static async UniTask AwaitLaunchAsync(
+            Task task,
+            CancellationToken cancellationToken)
         {
-            HotUpdateConfig.PlayMode = playMode;
-            HotUpdateConfig.UseYooAsset = useYooAsset;
-            if (playMode == HotUpdatePlayMode.Host)
+            await task.AsUniTask().AttachExternalCancellation(cancellationToken);
+        }
+
+        private async UniTask ShutdownAsync()
+        {
+            IsReady = false;
+            var failures = new List<Exception>();
+            if (_ownsUIManager && UIManager.Instance.IsInitialized)
             {
-                HotUpdateConfig.ConfigureHost(hostServerURL, fallbackServerURL);
+                try
+                {
+                    await UIManager.Instance.ShutdownAsync();
+                    _ownsUIManager = false;
+                }
+                catch (Exception exception)
+                {
+                    failures.Add(exception);
+                }
+            }
+
+            if (_composition != null)
+            {
+                try
+                {
+                    await _composition.ShutdownResourceServiceAsync();
+                    _composition = null;
+                }
+                catch (Exception exception)
+                {
+                    failures.Add(exception);
+                }
+            }
+
+            if (_runner != null)
+            {
+                try
+                {
+                    await _runner.ShutdownAsync();
+                    _runner = null;
+                }
+                catch (Exception exception)
+                {
+                    failures.Add(exception);
+                }
+            }
+
+            if (failures.Count > 0)
+            {
+                throw new AggregateException(
+                    "GameLauncher shutdown did not complete cleanly.",
+                    failures);
+            }
+        }
+
+        private BootstrapProfile CreateProfile()
+        {
+            var resolvedApplicationId = string.IsNullOrWhiteSpace(applicationId)
+                ? Application.identifier
+                : applicationId;
+            var resolvedApplicationVersion = string.IsNullOrWhiteSpace(applicationVersion)
+                ? Application.version
+                : applicationVersion;
+            var primary = string.IsNullOrWhiteSpace(hostServerURL)
+                ? null
+                : new Uri(hostServerURL.Trim().TrimEnd('/') + "/", UriKind.Absolute);
+            var fallback = string.IsNullOrWhiteSpace(fallbackServerURL)
+                ? null
+                : new Uri(fallbackServerURL.Trim().TrimEnd('/') + "/", UriKind.Absolute);
+
+            return new BootstrapProfile(
+                playMode,
+                new[] { new BootstrapPackageProfile(packageName) },
+                resolvedApplicationId,
+                channel,
+                resolvedApplicationVersion,
+                primary,
+                fallback,
+                TimeSpan.FromSeconds(timeoutSeconds),
+                maximumAttempts,
+                TimeSpan.FromSeconds(initialRetryBackoffSeconds),
+                TimeSpan.FromSeconds(maximumRetryBackoffSeconds),
+                downloadConcurrency,
+                allowVerifiedFallback
+                    ? BootstrapFallbackPolicy.VerifiedLocalOrBuiltin
+                    : BootstrapFallbackPolicy.Disabled,
+                diskSafetyMarginBytes,
+                requireDownloadConfirmation);
+        }
+
+        private static void HandleLaunchException(Exception exception)
+        {
+            if (!(exception is OperationCanceledException))
+            {
+                Debug.LogException(exception);
             }
         }
     }

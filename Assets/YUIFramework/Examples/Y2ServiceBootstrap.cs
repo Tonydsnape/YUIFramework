@@ -14,7 +14,7 @@ namespace YUIFramework.Examples
 
         private void Start()
         {
-            RunAsync(destroyCancellationToken).Forget();
+            RunAsync(destroyCancellationToken).Forget(Debug.LogException);
         }
 
         private async UniTask RunAsync(CancellationToken cancellationToken)
