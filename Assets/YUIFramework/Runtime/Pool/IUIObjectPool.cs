@@ -11,6 +11,7 @@ namespace YUIFramework
         bool TryRelease(Type contextType, UIPooledObject pooledObject, UIPoolPolicy policy, out UIPooledObject overflowObject);
         void Clear(Action<UIPooledObject> destroyAction = null);
         void Clear(Type contextType, Action<UIPooledObject> destroyAction = null);
+        int RemoveInvalid(Action<UIPooledObject> removeAction = null);
         int Count(Type contextType);
     }
 }

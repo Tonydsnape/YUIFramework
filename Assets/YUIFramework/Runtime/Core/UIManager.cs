@@ -17,11 +17,14 @@ namespace YUIFramework
         private readonly Dictionary<Type, UIConfig> _configRegistry = new Dictionary<Type, UIConfig>();
         private readonly Dictionary<Type, BaseContext> _activeContexts = new Dictionary<Type, BaseContext>();
         private readonly Dictionary<BaseContext, string> _contextPrefabKeys = new Dictionary<BaseContext, string>();
+        private readonly Dictionary<BaseContext, IUIInstanceLease> _contextInstanceLeases =
+            new Dictionary<BaseContext, IUIInstanceLease>();
         private readonly Dictionary<Type, int> _navigationCallbackTypes = new Dictionary<Type, int>();
         private readonly object _operationGate = new object();
         private readonly object _shutdownGate = new object();
 
         private IResourceLoader _resourceLoader;
+        private IUIResourceService _resourceService;
         private IUIObjectPool _objectPool = new UIObjectPool();
         private UILayerManager _layerManager;
         private UIRootRuntime _rootRuntime;
@@ -40,6 +43,11 @@ namespace YUIFramework
         public UIMessageCenter MessageCenter { get; private set; }
         public UITransitionRunner TransitionRunner => _transitionRunner;
         public UIRootRuntime RootRuntime => _rootRuntime;
+        /// <summary>
+        /// 阶段 5 资源所有权服务；仅在使用 <see cref="Initialize(IUIResourceService, IUIObjectPool)"/>
+        /// 注入时非空。使用旧版 <see cref="IResourceLoader"/> 初始化时为 null。
+        /// </summary>
+        public IUIResourceService ResourceService => _resourceService;
         public UILayerManager LayerManager => _layerManager;
         public UIInputLockService InputLocks => _rootRuntime?.InputLocks;
         public UIInputRouter Input => _rootRuntime?.Input;
@@ -85,9 +93,59 @@ namespace YUIFramework
             UIRootRuntime rootRuntime,
             IUIObjectPool pool = null)
         {
+            if (loader == null)
+            {
+                throw new ArgumentNullException(nameof(loader));
+            }
+
+            InitializeCore(loader, null, rootRuntime, pool);
+        }
+
+        /// <summary>
+        /// 使用阶段 5 资源所有权服务初始化。资源与实例租约由 <see cref="IUIResourceService"/> 管理，
+        /// UIManager 为每个 context 明确持有一份实例租约。
+        /// </summary>
+        public void Initialize(IUIResourceService resourceService, IUIObjectPool pool = null)
+        {
+            EnsureCanInitialize();
+            var runtime = UIRootRuntime.CreateCompatible();
+            try
+            {
+                Initialize(resourceService, runtime, pool);
+            }
+            catch
+            {
+                runtime.Dispose();
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 使用阶段 5 资源所有权服务与指定 UIRoot 初始化。
+        /// </summary>
+        public void Initialize(
+            IUIResourceService resourceService,
+            UIRootRuntime rootRuntime,
+            IUIObjectPool pool = null)
+        {
+            if (resourceService == null)
+            {
+                throw new ArgumentNullException(nameof(resourceService));
+            }
+
+            InitializeCore(null, resourceService, rootRuntime, pool);
+        }
+
+        private void InitializeCore(
+            IResourceLoader loader,
+            IUIResourceService resourceService,
+            UIRootRuntime rootRuntime,
+            IUIObjectPool pool)
+        {
             EnsureCanInitialize();
 
-            _resourceLoader = loader ?? throw new ArgumentNullException(nameof(loader));
+            _resourceLoader = loader;
+            _resourceService = resourceService;
             _rootRuntime = rootRuntime ?? throw new ArgumentNullException(nameof(rootRuntime));
             if (_rootRuntime.IsDisposed)
             {
@@ -106,6 +164,16 @@ namespace YUIFramework
             _transitionRunner = new UITransitionRunner();
             LastShutdownInputLockLeakCount = 0;
             _initialized = true;
+        }
+
+        public UniTask InitializeAsync(
+            IUIResourceService resourceService,
+            IUIObjectPool pool = null,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Initialize(resourceService, pool);
+            return UniTask.CompletedTask;
         }
 
         public UniTask InitializeAsync(
@@ -220,6 +288,10 @@ namespace YUIFramework
                     args,
                     cancellationToken);
             }
+
+            // 池化实例可能被框架外部销毁，这类条目会被对象池在 TryGet 时静默丢弃，
+            // 其实例租约必须在这里回收，否则引用计数永远不会归零。
+            ReclaimOrphanedInstanceLeases();
 
             if (_objectPool.TryGet(contextType, out var pooled))
             {
@@ -572,6 +644,24 @@ namespace YUIFramework
             _configRegistry.Clear();
             _activeContexts.Clear();
             _contextPrefabKeys.Clear();
+
+            // 兜底：关闭时释放任何仍被持有的实例租约，保证引用计数归零。
+            if (_contextInstanceLeases.Count > 0)
+            {
+                foreach (var lease in new List<IUIInstanceLease>(_contextInstanceLeases.Values))
+                {
+                    try
+                    {
+                        lease.Release();
+                    }
+                    catch (Exception exception)
+                    {
+                        errors.Add(exception);
+                    }
+                }
+
+                _contextInstanceLeases.Clear();
+            }
             _navigationCallbackTypes.Clear();
             LastShutdownInputLockLeakCount = _rootRuntime?.InputLocks.ActiveLockCount ?? 0;
             try
@@ -584,6 +674,7 @@ namespace YUIFramework
             }
 
             _resourceLoader = null;
+            _resourceService = null;
             _objectPool = null;
             _layerManager = null;
             _rootRuntime = null;
@@ -979,52 +1070,112 @@ namespace YUIFramework
             try
             {
                 context.TransitionTo(UIContextState.Loading);
-                GameObject prefab;
-                var loaderType = _resourceLoader?.GetType().Name ?? "UnknownLoader";
-                try
+                GameObject instance;
+                var loaderType = _resourceService != null
+                    ? nameof(UIResourceService)
+                    : _resourceLoader?.GetType().Name ?? "UnknownLoader";
+
+                if (_resourceService != null)
                 {
-                    prefab = await _resourceLoader.LoadPrefabAsync(
-                        prefabKey,
-                        operation.Token);
+                    IUIInstanceLease instanceLease;
+                    try
+                    {
+                        instanceLease = await _resourceService.InstantiateAsync(
+                            UIResourceKey.Of<GameObject>(prefabKey),
+                            null,
+                            operation.Token);
+                    }
+                    catch (ResourceLoadException exception)
+                    {
+                        throw new InvalidOperationException(
+                            BuildPrefabLoadErrorMessage(
+                                contextType,
+                                config,
+                                exception.LoaderType,
+                                exception.DetailMessage),
+                            exception);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        throw new InvalidOperationException(
+                            BuildPrefabLoadErrorMessage(
+                                contextType,
+                                config,
+                                loaderType,
+                                exception.Message),
+                            exception);
+                    }
+
+                    instance = instanceLease.Instance;
+                    if (instance == null)
+                    {
+                        instanceLease.Release();
+                        throw new InvalidOperationException(
+                            BuildPrefabLoadErrorMessage(
+                                contextType,
+                                config,
+                                loaderType,
+                                "Resource service returned a null instance."));
+                    }
+
+                    // 先登记租约再检查取消，保证任何后续失败都能在回滚路径释放它。
+                    resourceAcquired = true;
+                    _contextInstanceLeases[context] = instanceLease;
+                    operation.Token.ThrowIfCancellationRequested();
                 }
-                catch (ResourceLoadException exception)
+                else
                 {
-                    throw new InvalidOperationException(
-                        BuildPrefabLoadErrorMessage(
-                            contextType,
-                            config,
-                            exception.LoaderType,
-                            exception.DetailMessage),
-                        exception);
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception exception)
-                {
-                    throw new InvalidOperationException(
-                        BuildPrefabLoadErrorMessage(
-                            contextType,
-                            config,
-                            loaderType,
-                            exception.Message),
-                        exception);
+                    GameObject prefab;
+                    try
+                    {
+                        prefab = await _resourceLoader.LoadPrefabAsync(
+                            prefabKey,
+                            operation.Token);
+                    }
+                    catch (ResourceLoadException exception)
+                    {
+                        throw new InvalidOperationException(
+                            BuildPrefabLoadErrorMessage(
+                                contextType,
+                                config,
+                                exception.LoaderType,
+                                exception.DetailMessage),
+                            exception);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        throw new InvalidOperationException(
+                            BuildPrefabLoadErrorMessage(
+                                contextType,
+                                config,
+                                loaderType,
+                                exception.Message),
+                            exception);
+                    }
+
+                    if (prefab == null)
+                    {
+                        throw new InvalidOperationException(
+                            BuildPrefabLoadErrorMessage(
+                                contextType,
+                                config,
+                                loaderType,
+                                "Loader returned a null prefab."));
+                    }
+
+                    resourceAcquired = true;
+                    operation.Token.ThrowIfCancellationRequested();
+                    instance = UnityEngine.Object.Instantiate(prefab);
                 }
 
-                if (prefab == null)
-                {
-                    throw new InvalidOperationException(
-                        BuildPrefabLoadErrorMessage(
-                            contextType,
-                            config,
-                            loaderType,
-                            "Loader returned a null prefab."));
-                }
-
-                resourceAcquired = true;
-                operation.Token.ThrowIfCancellationRequested();
-                var instance = UnityEngine.Object.Instantiate(prefab);
                 var view = instance.GetComponent<UIView>() ?? instance.AddComponent<UIView>();
 
                 context.TransitionTo(UIContextState.Initializing);
@@ -1237,14 +1388,120 @@ namespace YUIFramework
             return CreateLifecycleException(context, operation, phase, failure);
         }
 
+        /// <summary>
+        /// 回收孤儿实例租约：池化实例可能被框架外部销毁，对象池会在 TryGet 时静默丢弃这些条目，
+        /// 使它们再也不会走到 ReleaseContextInternal。若不回收，其资源引用计数将永远不归零，
+        /// TrimUnused/低内存回收也无法生效。
+        /// </summary>
+        private void ReclaimOrphanedInstanceLeases()
+        {
+            _objectPool.RemoveInvalid(pooled =>
+            {
+                var context = pooled.Context;
+                if (context == null)
+                {
+                    return;
+                }
+
+                _contextPrefabKeys.TryGetValue(context, out var prefabKey);
+                var cleanupError = ReleaseContextInternal(context, prefabKey, true);
+                if (cleanupError != null)
+                {
+                    Debug.LogWarning(
+                        $"[UIManager] Failed to finalize an invalid pooled context: {cleanupError.Message}");
+                }
+            });
+
+            if (_contextInstanceLeases.Count == 0)
+            {
+                return;
+            }
+
+            List<BaseContext> orphans = null;
+            foreach (var pair in _contextInstanceLeases)
+            {
+                var context = pair.Key;
+                var lease = pair.Value;
+                if (!lease.IsReleased && lease.Instance != null)
+                {
+                    continue;
+                }
+
+                // 仍然是活动 context 时不回收，避免打断正在进行的生命周期。
+                if (context != null
+                    && _activeContexts.TryGetValue(context.GetType(), out var active)
+                    && ReferenceEquals(active, context))
+                {
+                    continue;
+                }
+
+                if (orphans == null)
+                {
+                    orphans = new List<BaseContext>();
+                }
+
+                orphans.Add(context);
+            }
+
+            if (orphans == null)
+            {
+                return;
+            }
+
+            foreach (var context in orphans)
+            {
+                _contextPrefabKeys.TryGetValue(context, out var prefabKey);
+                var cleanupError = ReleaseContextInternal(context, prefabKey, true);
+                if (cleanupError != null)
+                {
+                    Debug.LogWarning(
+                        $"[UIManager] Failed to reclaim an orphaned context: {cleanupError.Message}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 归还该 context 持有的实例租约（幂等）。仅在阶段 5 资源服务模式下存在租约。
+        /// </summary>
+        private Exception ReleaseOwnedInstanceLease(BaseContext context, bool releaseResource)        {
+            if (!releaseResource || !_contextInstanceLeases.TryGetValue(context, out var lease))
+            {
+                return null;
+            }
+
+            _contextInstanceLeases.Remove(context);
+            try
+            {
+                // 幂等：销毁实例并归还其持有的资源租约。
+                lease.Release();
+                return null;
+            }
+            catch (Exception exception)
+            {
+                return exception;
+            }
+        }
+
         private Exception ReleaseContextInternal(
             BaseContext context,
             string prefabKey,
             bool releaseResource)
         {
-            if (context == null || context.State == UIContextState.Released)
+            if (context == null)
             {
                 return null;
+            }
+
+            if (context.State == UIContextState.Released)
+            {
+                // 回滚可能已经把 context 推进到 Released，但实例租约是 UIManager 自己的
+                // 所有权记账，必须补偿归还，否则会泄漏一份引用计数。
+                var compensation = ReleaseOwnedInstanceLease(context, releaseResource);
+                return compensation == null
+                    ? null
+                    : new AggregateException(
+                        $"Failed to release UI resources for {context.GetType().Name}.",
+                        compensation);
             }
 
             var errors = new List<Exception>();
@@ -1278,7 +1535,15 @@ namespace YUIFramework
                 }
             }
 
-            if (releaseResource)
+            if (_contextInstanceLeases.ContainsKey(context))
+            {
+                var leaseError = ReleaseOwnedInstanceLease(context, releaseResource);
+                if (leaseError != null)
+                {
+                    errors.Add(leaseError);
+                }
+            }
+            else if (releaseResource && _resourceLoader != null)
             {
                 try
                 {

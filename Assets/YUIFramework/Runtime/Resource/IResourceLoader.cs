@@ -5,9 +5,9 @@ using UnityEngine;
 namespace YUIFramework
 {
     /// <summary>
-    /// 资源加载抽象接口，用于统一 UI 预制体的加载与释放。
-    /// ResourcesLoader 的 key 示例：UI/Pages/MainMenuPage。
-    /// AddressablesLoader 的 key 示例：Addressables Address（如 UI/Pages/MainMenuPage）。
+    /// 资源加载抽象接口，用于统一 UI 预制体的加载与释放（Y1 兼容契约）。
+    /// key 为逻辑资源地址（resource location），示例：UI/Pages/MainMenuPage。
+    /// 生产环境请改用 <see cref="IUIResourceService"/> 与 <c>YooAssetResourceProvider</c>。
     /// </summary>
     public interface IResourceLoader
     {

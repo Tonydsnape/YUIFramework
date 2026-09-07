@@ -5,8 +5,8 @@ using UnityEngine;
 namespace YUIFramework
 {
     /// <summary>
-    /// 基于 Resources 的默认加载器。
-    /// 后续可增加 AddressablesLoader 并在 Init 注入替换。
+    /// 基于 Resources 的加载器，仅用于测试与最小化 Editor 兼容。
+    /// 生产环境请使用 <see cref="IUIResourceService"/> 搭配 <c>YooAssetResourceProvider</c>。
     /// </summary>
     public sealed class ResourcesLoader : IResourceLoader
     {

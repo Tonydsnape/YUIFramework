@@ -10,7 +10,7 @@ Y2.0 uses one development line and advances through strict stage gates. Only one
 - Android and iOS are the first production targets.
 - YooAsset 3.x is the only production resource backend.
 - Resources remains only for tests and minimal Editor compatibility.
-- Addressables support will be removed.
+- Addressables support has been removed in stage 5.
 - Runtime asynchronous APIs will use UniTask and `CancellationToken`.
 - Breaking API changes are allowed behind a temporary Y1 compatibility facade.
 - Y2.0 prepares and validates HybridCLR boundaries but does not install HybridCLR.

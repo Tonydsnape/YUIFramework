@@ -87,6 +87,55 @@ namespace YUIFramework
             _buckets.Remove(contextType);
         }
 
+        public int RemoveInvalid(Action<UIPooledObject> removeAction = null)
+        {
+            var removed = 0;
+            var emptyBuckets = new List<Type>();
+            var removedObjects = new List<UIPooledObject>();
+            foreach (var pair in _buckets)
+            {
+                var retained = new Stack<UIPooledObject>(pair.Value.Count);
+                while (pair.Value.Count > 0)
+                {
+                    var pooled = pair.Value.Pop();
+                    if (pooled != null && pooled.IsValid)
+                    {
+                        retained.Push(pooled);
+                    }
+                    else
+                    {
+                        removed++;
+                        if (pooled != null)
+                        {
+                            removedObjects.Add(pooled);
+                        }
+                    }
+                }
+
+                while (retained.Count > 0)
+                {
+                    pair.Value.Push(retained.Pop());
+                }
+
+                if (pair.Value.Count == 0)
+                {
+                    emptyBuckets.Add(pair.Key);
+                }
+            }
+
+            foreach (var contextType in emptyBuckets)
+            {
+                _buckets.Remove(contextType);
+            }
+
+            foreach (var pooled in removedObjects)
+            {
+                removeAction?.Invoke(pooled);
+            }
+
+            return removed;
+        }
+
         public int Count(Type contextType)
         {
             return contextType != null && _buckets.TryGetValue(contextType, out var bucket) ? bucket.Count : 0;

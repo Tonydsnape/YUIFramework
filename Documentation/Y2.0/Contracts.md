@@ -98,6 +98,26 @@ contract, and documented limitations.
 bounded sorting leases, one modal mask/stack, focus restoration, and Escape/Android Back
 routing are defined in [UIRootAndInput.md](UIRootAndInput.md).
 
+## Resource ownership
+
+`IUIResourceService` is the stage 5 resource contract. It exposes strong `UIResourceKey`
+(package + location + type) keys, asset leases (`IUIAssetLease<T>`) and instance leases
+(`IUIInstanceLease`) as separate, independently owned, idempotently released units.
+Concurrent loads of one key share a single native load while every caller receives its own
+lease; cancelling one caller cancels only that caller's wait. Providers are registered per
+package through `IUIResourcePackageRegistry`, with an explicit default UI package. YooAsset
+3.x is the only production backend and Addressables has been removed. See
+[Resources.md](Resources.md) for the full ownership rules, cancellation semantics, preload
+and batch behavior, and leak diagnostics.
+
+`UIManager.Initialize(IUIResourceService)` opts a service instance into this model, and
+`UIManager.ResourceService` exposes it. `UIManager.Initialize(IResourceLoader)` remains the
+unchanged Y1 compatibility path.
+
+The package registry freezes when its owning resource service first loads or starts shutdown.
+`UIResourceService.ShutdownAsync` is one shared cleanup task; native/provider failures are
+aggregated, and a native release is counted only after it succeeds.
+
 ## Compatibility window
 
 The following remain Y1 compatibility APIs:
