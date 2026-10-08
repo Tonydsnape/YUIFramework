@@ -7,6 +7,7 @@ namespace YUIFramework
         Close,
         Hide,
         Show,
-        Release
+        Release,
+        Prewarm
     }
 }

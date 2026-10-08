@@ -149,6 +149,10 @@ snapshot.IsNativeBalanced;                 // native loads == native releases
 stage 0-4 code and tests are unaffected. `UIManager.ResourceService` is non-null only on the
 stage 5 path.
 
+Stage 7 instance prewarm is distinct from `IUIResourceService.PreloadAsync`: resource preload
+creates no GameObjects and ends with zero leases, while each idle prewarmed UI instance owns
+one `IUIInstanceLease` until pool eviction. See [Pooling.md](Pooling.md).
+
 ## Shutdown
 
 `ShutdownAsync` rejects new loads, waits for in-flight native loads to finish (they cannot be
@@ -199,13 +203,13 @@ await `ShutdownAsync`. `CancelDuringShowTransition_ReturnsLeaseOnceOperationUnwi
 behavior. Making cancellation synchronous with rollback would change the stage 3 coordinator
 contract and is deliberately left out of stage 5.
 
-**Externally destroyed pooled instances.** `IUIObjectPool.TryGet` silently drops pooled
-entries whose `ViewObject` was destroyed outside the framework, so those entries never reach
-`ReleaseContextInternal`. `UIManager.ReclaimOrphanedInstanceLeases` runs on the pooled-open
-path and returns those orphaned leases; without it the reference count for that asset would
-never reach zero and `TrimUnused`/`HandleLowMemory` could never reclaim it.
+**Externally destroyed pooled instances.** Stage 7 no longer silently drops these entries.
+The pool records an invalid-entry eviction and passes the entry to `UIManager`, which runs
+terminal context cleanup and returns the orphaned instance lease. Without that finalization
+the reference count for the asset could never reach zero.
 
 ## Out of scope for stage 5
 
 - Resource update bootstrap (EditorSimulate/Offline/Host, fallback, reset) — stage 6.
-- Full LRU, capacity limits and scoped pooling governance — stage 7.
+- Pooling scopes are ownership identities only; stage 12 scene/system UI services remain out
+  of scope.

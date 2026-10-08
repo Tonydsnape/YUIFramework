@@ -21,6 +21,7 @@ namespace YUIFramework
                            to == UIContextState.Faulted;
                 case UIContextState.Initializing:
                     return to == UIContextState.Opening ||
+                           to == UIContextState.Pooled ||
                            to == UIContextState.Releasing ||
                            to == UIContextState.Faulted;
                 case UIContextState.Opening:
