@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace YUIFramework
 {
@@ -7,36 +8,38 @@ namespace YUIFramework
     {
         internal static readonly object NavigationKey = new object();
 
-        [ThreadStatic]
-        private static HashSet<object> _keys;
+        private static readonly AsyncLocal<HashSet<object>> LocalKeys =
+            new AsyncLocal<HashSet<object>>();
 
         public static bool Contains(object key)
         {
-            return _keys != null && _keys.Contains(key);
+            return LocalKeys.Value != null && LocalKeys.Value.Contains(key);
         }
 
         public static IDisposable Enter(object key, bool includeNavigation)
         {
-            _keys ??= new HashSet<object>();
-            _keys.Add(key);
+            var previous = LocalKeys.Value;
+            var keys = previous == null
+                ? new HashSet<object>()
+                : new HashSet<object>(previous);
+            keys.Add(key);
             if (includeNavigation)
             {
-                _keys.Add(NavigationKey);
+                keys.Add(NavigationKey);
             }
 
-            return new Scope(key, includeNavigation);
+            LocalKeys.Value = keys;
+            return new Scope(previous);
         }
 
         private sealed class Scope : IDisposable
         {
-            private readonly object _key;
-            private readonly bool _includeNavigation;
+            private readonly HashSet<object> _previous;
             private bool _disposed;
 
-            public Scope(object key, bool includeNavigation)
+            public Scope(HashSet<object> previous)
             {
-                _key = key;
-                _includeNavigation = includeNavigation;
+                _previous = previous;
             }
 
             public void Dispose()
@@ -47,11 +50,7 @@ namespace YUIFramework
                 }
 
                 _disposed = true;
-                _keys?.Remove(_key);
-                if (_includeNavigation)
-                {
-                    _keys?.Remove(NavigationKey);
-                }
+                LocalKeys.Value = _previous;
             }
         }
     }

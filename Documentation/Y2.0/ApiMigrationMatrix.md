@@ -25,7 +25,12 @@ This matrix records intent before implementation. Final Y2 names may be refined 
 | `Task` runtime APIs | `UniTask` + `CancellationToken` | Runtime migration implemented |
 | Mutable `UIConfig` fields | Validated descriptor/config asset | Import/conversion helper |
 | `DefaultLayer` plus config layer | Single authoritative layer source | Resolve during contract phase |
-| `PreloadCount` placeholder | Implemented preload policy | Field maps to new policy |
+| `PreloadCount` placeholder | `UIManager.PrewarmAsync<T>` initialized-instance target | Requires caching/capacity; distinct from resource preload |
+| Per-type stack pool | Owned entries with per-key/global capacity, priority/LRU, expiry and scopes | Existing `CacheOnClose`/`MaxPoolSize` remain authoritative |
+| Context-only lifetime cancellation | Permanent `LifetimeToken` plus per-display `DisplayToken` | Existing lifetime helpers remain permanent; new display helpers clean on pooling |
+| Direct transition helper calls | `IUIService.Transitions` plus `RequestTransitionInterruption` | `UIManager.TransitionRunner` remains an obsolete forwarding property during the migration window |
+| Hard-coded fade/scale/slide endpoints | Captured stable alpha/scale/anchored-position baseline | `RefreshTransitionBaseline` updates the baseline after intentional layout/binding changes |
+| Lifecycle-only visibility | Orthogonal `BaseContext.VisibilityState` flags | Existing lifecycle states remain unchanged; interaction remains centrally composed |
 | `UIContextState.None` | `UIContextState.Unloaded` | Legacy alias; same numeric value |
 | `UIContextState.Shown` | `UIContextState.Opened` | Legacy alias; same numeric value |
 | `UIContextState.Closed` | `UIContextState.Pooled` | Legacy alias; closed-and-releasable is now `Released` |

@@ -193,6 +193,41 @@ namespace YUIFramework.Tests
         }
 
         [Test]
+        public void UIConfig_ToTransitionOptions_NormalizesNonFiniteValues()
+        {
+            var config = new UIConfig
+            {
+                ShowDuration = float.NaN,
+                HideDuration = float.PositiveInfinity,
+                SlideDistance = float.NegativeInfinity,
+                StartScale = float.NaN
+            };
+
+            var options = config.ToTransitionOptions();
+
+            Assert.That(options.ShowDuration, Is.Zero);
+            Assert.That(options.HideDuration, Is.Zero);
+            Assert.That(options.SlideDistance, Is.Zero);
+            Assert.That(options.StartScale, Is.EqualTo(0.9f));
+        }
+
+        [Test]
+        public void TransitionOptions_SnapshotClonesAnimationCurve()
+        {
+            var curve = AnimationCurve.Linear(0f, 0f, 1f, 1f);
+            var options = new UITransitionOptions
+            {
+                Curve = curve
+            };
+
+            var snapshot = options.Snapshot();
+            curve.MoveKey(1, new Keyframe(1f, 0.25f));
+
+            Assert.That(snapshot.Curve, Is.Not.SameAs(curve));
+            Assert.That(snapshot.Curve.Evaluate(1f), Is.EqualTo(1f).Within(0.0001f));
+        }
+
+        [Test]
         public void PoolPolicy_FromConfig_CopiesCacheSettings()
         {
             var config = new UIConfig
@@ -239,6 +274,7 @@ namespace YUIFramework.Tests
 
         [TestCase(UIContextState.Unloaded, UIContextState.Loading)]
         [TestCase(UIContextState.Loading, UIContextState.Initializing)]
+        [TestCase(UIContextState.Initializing, UIContextState.Pooled)]
         [TestCase(UIContextState.Initializing, UIContextState.Opening)]
         [TestCase(UIContextState.Opening, UIContextState.Opened)]
         [TestCase(UIContextState.Opened, UIContextState.Hiding)]

@@ -11,6 +11,7 @@ namespace YUIFramework
         SlideLeft,
         SlideRight,
         SlideUp,
-        SlideDown
+        SlideDown,
+        Custom
     }
 }

@@ -108,3 +108,33 @@ Stage 3 replaces the stage 2 fast-failure-on-concurrent-re-entry default with a 
 Stage 4 does not change the state graph or stage 3 FIFO/single-flight rules. It attaches
 sorting/modal/input/focus state to the same transactional lifecycle and keeps stage 5
 resource ownership out of scope.
+
+## Stage 7 pooled display lifetime
+
+Instance prewarm adds the deliberate `Initializing -> Pooled` edge: it runs `OnInit` once
+without ever running `OnShow` or publishing active/navigation/runtime visibility.
+
+`BaseContext.LifetimeToken` continues to span initialization through terminal release.
+Each activation from new, hidden, or pooled state receives `DisplayToken` and
+`DisplayArguments`. Before `OnShow`, `HandleResetForReuse` clears transient state and a fresh
+display token is created. An already-open refresh retains the current display scope so its
+existing rollback contract remains possible. A successful hide/close, pooled rollback,
+terminal failure, or shutdown cancels display work, temporary message
+subscriptions/bindings, and tracked input locks. Permanent Init-time bindings remain until
+`OnDestroy`. A canceled hide transition rolls back before this cleanup, so the stable visible
+display scope is retained.
+
+See [Pooling.md](Pooling.md) for prewarm, scope, capacity, eviction, and low-memory contracts.
+
+## Stage 8 visual operations
+
+Show and hide transitions are bound to the active `UIOperationId` and run inside the same
+per-type FIFO operation. Interrupt and reverse complete through the existing cancellation
+rollback edges; skip commits the current operation. A refresh of an already-open context
+rolls back to visible, while new/hidden/pooled opens roll back to hidden. A canceled close
+restores `Opened`, the captured visual baseline, interaction state, and
+`CloseDisposition.None`.
+
+Visibility is deliberately orthogonal to `UIContextState`: `Visible`, `Interactable`,
+`Covered`, and `Suspended` can change because of navigation, modal composition, or input
+locks without inventing lifecycle graph states. See [Transitions.md](Transitions.md).

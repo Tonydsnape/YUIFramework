@@ -140,7 +140,7 @@ Two special cases:
   different navigation intents; document it if your product surfaces `Replace` onto an
   existing-elsewhere page as a distinct user action.
 
-### Full-screen stack policy (unchanged from phase 0, made explicit)
+### Full-screen stack and visibility policy
 
 At any point in time, only the top stack entry should be `Opened`; every other tracked
 entry should be `Hidden`. Hidden stack entries retain bounded sorting leases but are not raycast-eligible. Showing a
@@ -149,6 +149,16 @@ contexts use a separate global modal stack and do not alter the page-stack ident
 `UIPageStackEntry.FullScreen` remains reserved. The legacy
 `UINavigateOptions.HideCurrentPage` property is retained for source compatibility but no
 longer changes behavior.
+
+Stage 8 keeps this hide-all compatibility policy and additionally derives `Covered` from
+the final reconciled stack. `UIConfig.SuspendWhenCovered` independently controls the
+cooperative managed-refresh gate. Push, Pop, Replace, BringToTop, guard rollback, and
+destructive-failure convergence all recompute coverage after their final stack mutation;
+a retired or dropped identity cannot retain navigation-owned suspension.
+
+Visual transitions execute inside each page type's existing FIFO lane. Explicit
+interrupt/reverse/skip signals may alter the active visual await but never start lifecycle
+callbacks outside the lane. See [Transitions.md](Transitions.md).
 
 ### Guards
 

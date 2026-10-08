@@ -30,9 +30,15 @@ namespace YUIFramework
         public int MaxPoolSize = 1;
 
         /// <summary>
-        /// 预加载数量。资源预热仍属于阶段 5 之后的资源/池治理范围。
+        /// 实例预热数量。由 UIManager.PrewarmAsync 消费，且受 MaxPoolSize 限制。
         /// </summary>
         public int PreloadCount;
+
+        /// <summary>闲置实例的淘汰优先级；数值越低越先淘汰。</summary>
+        public int PoolPriority;
+
+        /// <summary>闲置超时秒数；小于等于 0 表示不按时间过期。</summary>
+        public float PoolIdleTimeoutSeconds;
 
         /// <summary>
         /// 是否全屏（后续导航栈遮挡策略使用）。
@@ -80,6 +86,18 @@ namespace YUIFramework
         /// </summary>
         public float StartScale = 0.9f;
 
+        /// <summary>Optional easing curve. Null or empty uses the framework ease-out curve.</summary>
+        public UnityEngine.AnimationCurve TransitionCurve;
+
+        /// <summary>Identifier registered through UITransitionRunner.RegisterCustom.</summary>
+        public string CustomTransitionId;
+
+        /// <summary>Refresh the stable transform/alpha baseline when a pooled view is rebound.</summary>
+        public bool RefreshTransitionBaselineOnReuse = true;
+
+        /// <summary>Pause framework-managed refresh work while this page is covered.</summary>
+        public bool SuspendWhenCovered = true;
+
         /// <summary>
         /// 转换为运行时转场配置。
         /// </summary>
@@ -92,7 +110,9 @@ namespace YUIFramework
                 HideDuration = HideDuration,
                 IgnoreTimeScale = IgnoreTransitionTimeScale,
                 SlideDistance = SlideDistance,
-                StartScale = StartScale
+                StartScale = StartScale,
+                Curve = TransitionCurve,
+                CustomTransitionId = CustomTransitionId
             };
             options.Normalize();
             return options;

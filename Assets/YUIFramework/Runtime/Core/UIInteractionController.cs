@@ -20,6 +20,8 @@ namespace YUIFramework
         private UIInputLockService _inputLocks;
         private UIModalService _modals;
         private bool _disposed;
+        private bool _applying;
+        private bool _applyPending;
 
         internal UIInteractionController(
             UILayerManager layers,
@@ -112,6 +114,31 @@ namespace YUIFramework
                 return;
             }
 
+            if (_applying)
+            {
+                _applyPending = true;
+                return;
+            }
+
+            _applying = true;
+            try
+            {
+                ApplyCore();
+            }
+            finally
+            {
+                _applying = false;
+            }
+
+            if (_applyPending)
+            {
+                _applyPending = false;
+                Apply();
+            }
+        }
+
+        private void ApplyCore()
+        {
             var topModal = _modals.Top;
             var modalIndex = topModal == null ? -1 : _profile.GetIndex(topModal.Layer);
             foreach (var descriptor in _profile.Descriptors)
@@ -134,6 +161,10 @@ namespace YUIFramework
 
                 CaptureRaycasters(context);
                 var eligible = IsInteractable(context);
+                var covered =
+                    topModal != null &&
+                    !ReferenceEquals(context, topModal) &&
+                    _profile.GetIndex(context.Layer) <= modalIndex;
                 foreach (var raycaster in _raycasters[context])
                 {
                     if (raycaster.Key != null)
@@ -141,6 +172,8 @@ namespace YUIFramework
                         raycaster.Key.enabled = raycaster.Value && eligible;
                     }
                 }
+
+                context.SetInteractionVisibility(eligible, covered);
             }
 
             _focus.Refresh(IsInteractable);

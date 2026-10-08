@@ -64,6 +64,19 @@ All notable changes to YUIFramework are documented in this file.
   guaranteeing that code loading runs after resources and before business entry.
 - Stage 6 fake-backend and adapter EditMode coverage plus
   `Documentation/Y2.0/Bootstrap.md` and `Documentation/Y2.0/Migration.md`.
+- Stage 7 ownership-aware instance pooling with real `PreloadCount` prewarm, per-key/global
+  capacity, priority/LRU and idle expiry, scene/module/global scopes, low-memory trimming,
+  display-scope cleanup, read-only diagnostics, and `Documentation/Y2.0/Pooling.md`.
+- Stage 8 generation-fenced fade/scale/slide sessions, explicit interrupt/reverse/skip
+  signals, immutable curve/config snapshots, custom `IUITransition` registration,
+  stable visual baselines, unscaled/injectable timing, and
+  `Documentation/Y2.0/Transitions.md`.
+- Orthogonal context visibility (`Visible`, `Interactable`, `Covered`, `Suspended`) and a
+  display/lifetime-bound cooperative suspension gate, with navigation/modal/input
+  composition and rollback restoration.
+- Built-in transition teardown now retires registry identity before cancellation, preventing
+  delayed continuations from writing rebound views; disposal continues canceling remaining
+  sessions when an individual callback fails and reports the failures together.
 
 ### Changed
 
@@ -140,6 +153,16 @@ All notable changes to YUIFramework are documented in this file.
 - Repeated `GameLauncher.LaunchAsync` calls are single-flight, readiness is published only after
   listeners succeed, the startup sample attempts every teardown stage, and a faulted
   `UIResourceService` shutdown can retry retained cleanup work.
+- Pool entries now reject duplicate, cross-pool, mismatched, or destroyed returns; externally
+  destroyed idle instances are fully finalized instead of silently discarded.
+- Resource preload and initialized-instance prewarm are separate operations. Prewarm shares
+  the per-type FIFO lane with Open/Close, rolls back call-local partial work, and cannot
+  repopulate an ended scope.
+- Context display tokens, tracked tasks/input locks/messages/bindings, and transient arguments
+  are reset on pooling while permanent Init-time lifetime state remains intact.
+- Show and navigation-hide animations now run inside their existing per-type FIFO lifecycle
+  operations. Built-in visual writes are single-owner and generation-fenced; pooled reuse
+  restores captured non-default alpha, scale, and position without drift.
 
 ### Migration
 
@@ -147,5 +170,5 @@ All notable changes to YUIFramework are documented in this file.
 - YooAsset 3.x is the only production resource backend as of stage 5; Addressables support
   has been removed, and Resources is limited to tests and minimal Editor compatibility.
 - Runtime asynchronous APIs use UniTask with `CancellationToken`.
-- Stage 6 resource-update bootstrap is complete. Stage 7 pooling and memory governance has
-  not started.
+- Stage 8 interruptible transitions and visibility is complete. Stage 9 messaging and
+  MVVM lifecycle work has not started.

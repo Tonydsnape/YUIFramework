@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace YUIFramework
 {
@@ -19,9 +20,18 @@ namespace YUIFramework
         private readonly Dictionary<BaseContext, string> _contextPrefabKeys = new Dictionary<BaseContext, string>();
         private readonly Dictionary<BaseContext, IUIInstanceLease> _contextInstanceLeases =
             new Dictionary<BaseContext, IUIInstanceLease>();
+        private readonly Dictionary<BaseContext, UIPoolScope> _contextScopes =
+            new Dictionary<BaseContext, UIPoolScope>();
+        private readonly Dictionary<Guid, PoolScopeState> _poolScopes =
+            new Dictionary<Guid, PoolScopeState>();
+        private readonly Dictionary<int, UIPoolScope> _sceneScopes =
+            new Dictionary<int, UIPoolScope>();
         private readonly Dictionary<Type, int> _navigationCallbackTypes = new Dictionary<Type, int>();
+        private readonly Dictionary<Type, BaseContext> _transitioningContexts =
+            new Dictionary<Type, BaseContext>();
         private readonly object _operationGate = new object();
         private readonly object _shutdownGate = new object();
+        private readonly IUITransitionClock _transitionClock;
 
         private IResourceLoader _resourceLoader;
         private IUIResourceService _resourceService;
@@ -41,7 +51,9 @@ namespace YUIFramework
 
         public UINavigator Navigator { get; private set; }
         public UIMessageCenter MessageCenter { get; private set; }
-        public UITransitionRunner TransitionRunner => _transitionRunner;
+        public UITransitionRunner Transitions => _transitionRunner;
+        [Obsolete("Use Transitions. TransitionRunner will be removed after the Y2 migration window.")]
+        public UITransitionRunner TransitionRunner => Transitions;
         public UIRootRuntime RootRuntime => _rootRuntime;
         /// <summary>
         /// 阶段 5 资源所有权服务；仅在使用 <see cref="Initialize(IUIResourceService, IUIObjectPool)"/>
@@ -54,6 +66,17 @@ namespace YUIFramework
         public UIFocusService Focus => _rootRuntime?.Focus;
         public UIModalService Modals => _rootRuntime?.Modals;
         public int LastShutdownInputLockLeakCount { get; private set; }
+        public UIPoolDiagnosticsSnapshot PoolDiagnostics =>
+            _objectPool?.GetDiagnostics() ??
+            new UIPoolDiagnosticsSnapshot(
+                Array.Empty<UIPoolEntrySnapshot>(),
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0);
         public bool IsInitialized => _initialized;
         internal CancellationToken ServiceLifetimeToken =>
             _serviceLifetimeCancellation?.Token ?? CancellationToken.None;
@@ -63,8 +86,9 @@ namespace YUIFramework
         IUINavigator IUIService.Navigator => Navigator;
         IUIMessageBus IUIService.MessageBus => MessageCenter;
 
-        public UIManager()
+        public UIManager(IUITransitionClock transitionClock = null)
         {
+            _transitionClock = transitionClock;
         }
 
         [Obsolete("Use Initialize on an injected IUIService. UIManager.Init will be removed after the Y2 migration window.")]
@@ -161,8 +185,10 @@ namespace YUIFramework
             _coordinator = new UIOperationCoordinator();
             Navigator = new UINavigator(this);
             _rootRuntime.BindNavigator(Navigator);
-            _transitionRunner = new UITransitionRunner();
+            _transitionRunner = new UITransitionRunner(_transitionClock);
             LastShutdownInputLockLeakCount = 0;
+            Application.lowMemory += OnApplicationLowMemory;
+            SceneManager.sceneUnloaded += OnSceneUnloaded;
             _initialized = true;
         }
 
@@ -216,6 +242,21 @@ namespace YUIFramework
                 throw new ArgumentException("UIConfig.PrefabKey 不能为空。", nameof(config));
             }
 
+            if (config.PreloadCount < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(config),
+                    "UIConfig.PreloadCount cannot be negative.");
+            }
+
+            if (config.PreloadCount > 0 &&
+                (!config.CacheOnClose || config.MaxPoolSize <= 0))
+            {
+                throw new ArgumentException(
+                    "Instance prewarming requires CacheOnClose and a positive MaxPoolSize.",
+                    nameof(config));
+            }
+
             _configRegistry[typeof(T)] = config;
         }
 
@@ -235,7 +276,235 @@ namespace YUIFramework
             return _configRegistry.TryGetValue(contextType, out config);
         }
 
+        public UIPoolScope CreateModuleScope(string moduleName)
+        {
+            EnsureInitialized();
+            EnsureAcceptingOperations();
+            var scope = UIPoolScope.CreateModule(moduleName);
+            _poolScopes.Add(
+                scope.Id,
+                new PoolScopeState(scope, _serviceLifetimeCancellation.Token));
+            return scope;
+        }
+
+        public UIPoolScope GetSceneScope(Scene scene)
+        {
+            EnsureInitialized();
+            EnsureAcceptingOperations();
+            if (!scene.IsValid())
+            {
+                throw new ArgumentException("A valid scene is required.", nameof(scene));
+            }
+
+            if (_sceneScopes.TryGetValue(scene.handle, out var existing))
+            {
+                return existing;
+            }
+
+            var scope = UIPoolScope.CreateScene(scene.handle, scene.name);
+            _sceneScopes.Add(scene.handle, scope);
+            _poolScopes[scope.Id] =
+                new PoolScopeState(scope, _serviceLifetimeCancellation.Token);
+            return scope;
+        }
+
+        public UniTask<int> PrewarmAsync<T>(
+            CancellationToken cancellationToken = default)
+            where T : BaseContext
+        {
+            return PrewarmAsync<T>(UIPoolScope.Global, cancellationToken);
+        }
+
+        public UniTask<int> PrewarmAsync<T>(
+            UIPoolScope scope,
+            CancellationToken cancellationToken = default)
+            where T : BaseContext
+        {
+            EnsureInitialized();
+            EnsureAcceptingOperations();
+            cancellationToken.ThrowIfCancellationRequested();
+            scope = NormalizeScope(scope);
+            EnsureScopeAlive(scope);
+            if (!_configRegistry.TryGetValue(typeof(T), out var config))
+            {
+                throw new KeyNotFoundException($"未注册 UI Context: {typeof(T).Name}");
+            }
+
+            return PrewarmTypeAsync(typeof(T), config, scope, cancellationToken);
+        }
+
+        public async UniTask<int> PrewarmRegisteredAsync(
+            UIPoolScope scope = default,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureInitialized();
+            EnsureAcceptingOperations();
+            scope = NormalizeScope(scope);
+            EnsureScopeAlive(scope);
+
+            var total = 0;
+            var registrations = new List<KeyValuePair<Type, UIConfig>>(_configRegistry);
+            foreach (var registration in registrations)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (registration.Value.PreloadCount <= 0)
+                {
+                    continue;
+                }
+
+                total += await PrewarmTypeAsync(
+                    registration.Key,
+                    registration.Value,
+                    scope,
+                    cancellationToken);
+            }
+
+            return total;
+        }
+
+        private UniTask<int> PrewarmTypeAsync(
+            Type contextType,
+            UIConfig config,
+            UIPoolScope scope,
+            CancellationToken cancellationToken)
+        {
+            return _coordinator.EnqueueAsync(
+                contextType,
+                "Prewarm",
+                ct => PrewarmTypeCoreAsync(contextType, config, scope, ct),
+                cancellationToken);
+        }
+
+        private async UniTask<int> PrewarmTypeCoreAsync(
+            Type contextType,
+            UIConfig config,
+            UIPoolScope scope,
+            CancellationToken cancellationToken)
+        {
+            EvictExpiredPoolEntries();
+            var target = Math.Min(
+                Math.Min(config.PreloadCount, config.MaxPoolSize),
+                _objectPool.GetDiagnostics().GlobalCapacity);
+            var missing = Math.Max(0, target - _objectPool.Count(contextType, scope));
+            if (missing == 0)
+            {
+                return 0;
+            }
+
+            var created = new List<UIPooledObject>(missing);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                GetScopeServiceToken(scope));
+            try
+            {
+                for (var index = 0; index < missing; index++)
+                {
+                    linked.Token.ThrowIfCancellationRequested();
+                    EnsureScopeAlive(scope);
+                    var entry = await CreatePrewarmedContextAsync(
+                        contextType,
+                        config,
+                        scope,
+                        linked.Token);
+                    created.Add(entry);
+                }
+
+                return created.Count;
+            }
+            catch (Exception original)
+            {
+                var errors = new List<Exception>();
+                foreach (var entry in created)
+                {
+                    if (!_objectPool.Remove(entry))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        DestroyPooledObject(entry);
+                    }
+                    catch (Exception exception)
+                    {
+                        errors.Add(exception);
+                    }
+                }
+
+                if (errors.Count > 0)
+                {
+                    errors.Insert(0, original);
+                    throw new AggregateException(
+                        "Prewarm rollback did not clean every created instance.",
+                        errors);
+                }
+
+                throw;
+            }
+        }
+
         public UniTask<T> OpenAsync<T>(
+            object args = null,
+            CancellationToken cancellationToken = default)
+            where T : BaseContext
+        {
+            return OpenInScopeAsync<T>(
+                UIPoolScope.Global,
+                args,
+                cancellationToken);
+        }
+
+        public bool RequestTransitionInterruption<T>(
+            UITransitionInterruption interruption)
+            where T : BaseContext
+        {
+            EnsureInitialized();
+            if (!_acceptingOperations)
+            {
+                return false;
+            }
+
+            var type = typeof(T);
+            if (!_transitioningContexts.TryGetValue(type, out var context))
+            {
+                _activeContexts.TryGetValue(type, out context);
+            }
+
+            return RequestTransitionInterruption(context, interruption);
+        }
+
+        public bool RequestTransitionInterruption(
+            BaseContext context,
+            UITransitionInterruption interruption)
+        {
+            if (!_initialized || !_acceptingOperations ||
+                context == null ||
+                context.View == null ||
+                context.View.RectTransform == null)
+            {
+                return false;
+            }
+
+            return _transitionRunner.RequestInterruption(
+                context.View.RectTransform,
+                interruption);
+        }
+
+        public void RefreshTransitionBaseline(BaseContext context)
+        {
+            EnsureInitialized();
+            if (context == null ||
+                context.View == null ||
+                context.View.RectTransform == null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            _transitionRunner.CaptureBaseline(context.View.RectTransform, true);
+        }
+
+        public UniTask<T> OpenInScopeAsync<T>(
+            UIPoolScope scope,
             object args = null,
             CancellationToken cancellationToken = default)
             where T : BaseContext
@@ -243,11 +512,14 @@ namespace YUIFramework
             EnsureInitialized();
             EnsureAcceptingOperations();
             cancellationToken.ThrowIfCancellationRequested();
+            scope = NormalizeScope(scope);
+            EnsureScopeAlive(scope);
 
-            return OpenCoordinatedAsync<T>(args, cancellationToken);
+            return OpenCoordinatedAsync<T>(scope, args, cancellationToken);
         }
 
         private UniTask<T> OpenCoordinatedAsync<T>(
+            UIPoolScope scope,
             object args,
             CancellationToken cancellationToken)
             where T : BaseContext
@@ -265,16 +537,24 @@ namespace YUIFramework
             return _coordinator.EnqueueOpenAsync<T>(
                 contextType,
                 args,
+                scope,
                 !_activeContexts.ContainsKey(contextType) &&
-                (_objectPool == null || _objectPool.Count(contextType) == 0),
-                (markFirstCreation, ct) => OpenRoutedAsync<T>(contextType, config, args, markFirstCreation, ct),
+                (_objectPool == null || _objectPool.Count(contextType, scope) == 0),
+                (markFirstCreation, ct) => OpenRoutedAsync<T>(
+                    contextType,
+                    config,
+                    scope,
+                    args,
+                    markFirstCreation,
+                    ct),
                 cancellationToken,
-                _serviceLifetimeCancellation.Token);
+                GetScopeServiceToken(scope));
         }
 
         private async UniTask<T> OpenRoutedAsync<T>(
             Type contextType,
             UIConfig config,
+            UIPoolScope scope,
             object args,
             Action markFirstCreation,
             CancellationToken cancellationToken)
@@ -282,6 +562,13 @@ namespace YUIFramework
         {
             if (_activeContexts.TryGetValue(contextType, out var cachedContext))
             {
+                if (ResolveContextScope(cachedContext) != scope)
+                {
+                    throw new InvalidOperationException(
+                        $"{contextType.Name} is already active in scope " +
+                        $"{ResolveContextScope(cachedContext)} and cannot be reopened in {scope}.");
+                }
+
                 return await OpenExistingAsync<T>(
                     cachedContext,
                     config,
@@ -293,11 +580,16 @@ namespace YUIFramework
             // 其实例租约必须在这里回收，否则引用计数永远不会归零。
             ReclaimOrphanedInstanceLeases();
 
-            if (_objectPool.TryGet(contextType, out var pooled))
+            if (_objectPool.TryGet(
+                    contextType,
+                    scope,
+                    FinalizeInvalidPooledObject,
+                    out var pooled))
             {
                 return await OpenPooledAsync<T>(
                     pooled,
                     config,
+                    scope,
                     args,
                     cancellationToken);
             }
@@ -305,7 +597,7 @@ namespace YUIFramework
             // Only a genuinely brand-new instantiation is eligible for single-flight
             // merging with a later equivalent concurrent Open request.
             markFirstCreation();
-            return await OpenNewAsync<T>(config, args, cancellationToken);
+            return await OpenNewAsync<T>(config, scope, args, cancellationToken);
         }
 
         public async UniTask<UIHandle<T>> OpenHandleAsync<T>(
@@ -325,7 +617,10 @@ namespace YUIFramework
         {
             using (EnterNavigationCallbackType(typeof(T)))
             {
-                return await OpenCoordinatedAsync<T>(args, cancellationToken);
+                return await OpenCoordinatedAsync<T>(
+                    UIPoolScope.Global,
+                    args,
+                    cancellationToken);
             }
         }
 
@@ -437,6 +732,7 @@ namespace YUIFramework
 
             _configRegistry.TryGetValue(contextType, out var config);
             var prefabKey = ResolvePrefabKey(ctx, config);
+            var scope = ResolveContextScope(ctx);
             using var operation = BeginContextOperation(
                 ctx,
                 UIOperationKind.Close,
@@ -447,7 +743,8 @@ namespace YUIFramework
                 policy != null &&
                 policy.CacheOnClose &&
                 policy.MaxPoolSize > 0 &&
-                _objectPool != null;
+                _objectPool != null &&
+                IsScopeAlive(scope);
             ctx.CloseDisposition = intendsToPool
                 ? UICloseDisposition.Pool
                 : UICloseDisposition.Release;
@@ -459,19 +756,23 @@ namespace YUIFramework
                     ctx.TransitionTo(UIContextState.Hiding);
                     try
                     {
-                        await PlayHideTransitionAsync(ctx, config, operation.Token);
+                        await PlayHideTransitionAsync(
+                            ctx,
+                            config,
+                            operation.Id,
+                            operation.Token);
                     }
                     catch (OperationCanceledException)
                     {
+                        NormalizeTransitionVisual(ctx);
+                        ctx.CloseDisposition = UICloseDisposition.None;
                         ctx.TransitionTo(UIContextState.Opened);
                         throw;
                     }
 
+                    ThrowDisplayCleanupError(ctx);
                     ctx.OnHide();
-                    if (ctx.ViewObject != null)
-                    {
-                        ctx.ViewObject.SetActive(false);
-                    }
+                    DeactivateView(ctx);
 
                     ctx.TransitionTo(UIContextState.Hidden);
                     HideContextRuntime(ctx);
@@ -498,8 +799,22 @@ namespace YUIFramework
                             contextType,
                             pooledObject,
                             policy,
-                            out var overflow))
+                            scope,
+                            "Open",
+                            _contextInstanceLeases.ContainsKey(ctx),
+                            out var overflow,
+                            out var rejection))
                     {
+                        try
+                        {
+                            DestroyOverflow(overflow, false);
+                        }
+                        catch
+                        {
+                            _objectPool.Remove(pooledObject);
+                            throw;
+                        }
+
                         ctx.TransitionTo(UIContextState.Pooled);
                         return;
                     }
@@ -510,6 +825,9 @@ namespace YUIFramework
                         DestroyContextInternal(overflow.Context, overflow.PrefabKey);
                         return;
                     }
+
+                    throw new InvalidOperationException(
+                        $"Pool rejected {contextType.Name}: {rejection}.");
                 }
 
                 DestroyContextInternal(ctx, prefabKey);
@@ -585,6 +903,9 @@ namespace YUIFramework
 
         private async UniTask ShutdownCoreAsync()
         {
+            Application.lowMemory -= OnApplicationLowMemory;
+            SceneManager.sceneUnloaded -= OnSceneUnloaded;
+
             // Reject all new public work first. The navigator stops accepting commands,
             // then its already-accepted transaction may still use the UI lanes to finish
             // cancellation rollback before those lanes are stopped in turn.
@@ -644,6 +965,7 @@ namespace YUIFramework
             _configRegistry.Clear();
             _activeContexts.Clear();
             _contextPrefabKeys.Clear();
+            _contextScopes.Clear();
 
             // 兜底：关闭时释放任何仍被持有的实例租约，保证引用计数归零。
             if (_contextInstanceLeases.Count > 0)
@@ -663,10 +985,33 @@ namespace YUIFramework
                 _contextInstanceLeases.Clear();
             }
             _navigationCallbackTypes.Clear();
+            foreach (var scope in _poolScopes.Values)
+            {
+                try
+                {
+                    scope.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    errors.Add(exception);
+                }
+            }
+
+            _poolScopes.Clear();
+            _sceneScopes.Clear();
             LastShutdownInputLockLeakCount = _rootRuntime?.InputLocks.ActiveLockCount ?? 0;
             try
             {
                 _rootRuntime?.Dispose();
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
+
+            try
+            {
+                _transitionRunner?.Dispose();
             }
             catch (Exception exception)
             {
@@ -717,13 +1062,195 @@ namespace YUIFramework
         public void ClearPool<T>() where T : BaseContext
         {
             EnsureInitialized();
+            EnsureAcceptingOperations();
+            if (_coordinator.IsBusy(typeof(T)))
+            {
+                throw new InvalidOperationException(
+                    $"Cannot synchronously clear {typeof(T).Name} while its operation lane is busy. " +
+                    "Use ClearPoolAsync<T> instead.");
+            }
+
             ClearPools(typeof(T));
         }
 
         public void ClearAllPools()
         {
             EnsureInitialized();
+            EnsureAcceptingOperations();
+            foreach (var contextType in _configRegistry.Keys)
+            {
+                if (_coordinator.IsBusy(contextType))
+                {
+                    throw new InvalidOperationException(
+                        "Cannot synchronously clear all pools while an operation lane is busy.");
+                }
+            }
+
             ClearPools(null);
+        }
+
+        public UniTask ClearPoolAsync<T>(
+            CancellationToken cancellationToken = default)
+            where T : BaseContext
+        {
+            EnsureInitialized();
+            EnsureAcceptingOperations();
+            return _coordinator.EnqueueAsync(
+                typeof(T),
+                "ClearPool",
+                _ =>
+                {
+                    ClearPools(typeof(T));
+                    return UniTask.CompletedTask;
+                },
+                cancellationToken);
+        }
+
+        public async UniTask ReleaseScopeAsync(
+            UIPoolScope scope,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureInitialized();
+            EnsureAcceptingOperations();
+            scope = NormalizeScope(scope);
+            if (scope.Kind == UIPoolScopeKind.Global)
+            {
+                throw new InvalidOperationException("The global UI pool scope cannot be released.");
+            }
+
+            if (!_poolScopes.TryGetValue(scope.Id, out var state) || state.Ended)
+            {
+                return;
+            }
+
+            var errors = new List<Exception>();
+            try
+            {
+                state.End();
+            }
+            catch (Exception exception)
+            {
+                AddFlattened(errors, exception);
+            }
+            try
+            {
+                var registeredTypes = new List<Type>(_configRegistry.Keys);
+                foreach (var contextType in registeredTypes)
+                {
+                    try
+                    {
+                        await _coordinator.EnqueueAsync(
+                            contextType,
+                            "ReleaseScopeBarrier",
+                            _ => UniTask.CompletedTask,
+                            CancellationToken.None);
+                    }
+                    catch (Exception exception)
+                    {
+                        AddFlattened(errors, exception);
+                    }
+                }
+
+                try
+                {
+                    _objectPool.ClearScope(
+                        scope,
+                        pooled => DestroyPooledObject(pooled));
+                }
+                catch (Exception exception)
+                {
+                    AddFlattened(errors, exception);
+                }
+            }
+            finally
+            {
+                try
+                {
+                    state.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    AddFlattened(errors, exception);
+                }
+
+                if (_poolScopes.TryGetValue(scope.Id, out var current) &&
+                    ReferenceEquals(current, state))
+                {
+                    _poolScopes.Remove(scope.Id);
+                }
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (errors.Count > 0)
+            {
+                throw new AggregateException(
+                    $"One or more pooled contexts failed while releasing scope {scope}.",
+                    errors);
+            }
+        }
+
+        public int EvictExpiredPoolEntries()
+        {
+            EnsureInitialized();
+            EnsureAcceptingOperations();
+            var errors = new List<Exception>();
+            var count = 0;
+            try
+            {
+                count = _objectPool.EvictExpired(
+                    pooled => DestroyPooledObject(pooled));
+            }
+            catch (Exception exception)
+            {
+                AddFlattened(errors, exception);
+            }
+
+            if (errors.Count > 0)
+            {
+                throw new AggregateException(
+                    "One or more expired pooled contexts failed cleanup.",
+                    errors);
+            }
+
+            return count;
+        }
+
+        public int HandleLowMemory()
+        {
+            EnsureInitialized();
+            EnsureAcceptingOperations();
+            var errors = new List<Exception>();
+            var released = 0;
+            try
+            {
+                released += _objectPool.EvictIdle(
+                    pooled => DestroyPooledObject(pooled));
+            }
+            catch (Exception exception)
+            {
+                AddFlattened(errors, exception);
+            }
+
+            if (_resourceService != null)
+            {
+                try
+                {
+                    released += _resourceService.HandleLowMemory();
+                }
+                catch (Exception exception)
+                {
+                    AddFlattened(errors, exception);
+                }
+            }
+
+            if (errors.Count > 0)
+            {
+                throw new AggregateException(
+                    "Low-memory cleanup completed with one or more failures.",
+                    errors);
+            }
+
+            return released;
         }
 
         /// <summary>
@@ -732,6 +1259,14 @@ namespace YUIFramework
         /// 不会绕过队列产生竞态。
         /// </summary>
         internal UniTask HideCoreAsync(BaseContext ctx, CancellationToken cancellationToken = default)
+        {
+            return HideCoreAsync(ctx, cancellationToken, false);
+        }
+
+        private UniTask HideCoreAsync(
+            BaseContext ctx,
+            CancellationToken cancellationToken,
+            bool allowDuringShutdown)
         {
             EnsureInitialized();
 
@@ -744,7 +1279,7 @@ namespace YUIFramework
             return _coordinator.EnqueueAsync(
                 contextType,
                 "Hide",
-                _ => HideCoreExecuteAsync(ctx),
+                ct => HideCoreExecuteAsync(ctx, ct, allowDuringShutdown),
                 cancellationToken);
         }
 
@@ -763,33 +1298,66 @@ namespace YUIFramework
             }
         }
 
-        private UniTask HideCoreExecuteAsync(BaseContext ctx)
+        internal async UniTask HideForNavigationRollbackAsync(BaseContext context)
+        {
+            if (context == null)
+            {
+                return;
+            }
+
+            using (EnterNavigationCallbackType(context.GetType()))
+            {
+                await HideCoreAsync(context, CancellationToken.None, true);
+            }
+        }
+
+        private async UniTask HideCoreExecuteAsync(
+            BaseContext ctx,
+            CancellationToken cancellationToken,
+            bool allowDuringShutdown)
         {
             if (ctx.State == UIContextState.Hidden)
             {
-                return UniTask.CompletedTask;
+                return;
             }
 
             using var operation = BeginContextOperation(
                 ctx,
                 UIOperationKind.Hide,
-                CancellationToken.None,
-                false);
+                cancellationToken,
+                allowDuringShutdown);
             try
             {
                 ctx.TransitionTo(UIContextState.Hiding);
+                _configRegistry.TryGetValue(ctx.GetType(), out var config);
+                await PlayHideTransitionAsync(
+                    ctx,
+                    config,
+                    operation.Id,
+                    operation.Token);
+                ThrowDisplayCleanupError(ctx);
                 ctx.OnHide();
-                if (ctx.ViewObject != null)
-                {
-                    ctx.ViewObject.SetActive(false);
-                }
+                DeactivateView(ctx);
 
                 ctx.TransitionTo(UIContextState.Hidden);
                 HideContextRuntime(ctx);
             }
+            catch (OperationCanceledException)
+            {
+                NormalizeTransitionVisual(ctx);
+                ctx.CloseDisposition = UICloseDisposition.None;
+                if (ctx.State == UIContextState.Hiding)
+                {
+                    ctx.TransitionTo(UIContextState.Opened);
+                }
+
+                ActivateContextRuntime(ctx);
+                throw;
+            }
             catch (Exception exception)
             {
                 ctx.RecordFailure(exception, false);
+                NormalizeTransitionVisual(ctx);
                 if (ctx.ViewObject != null)
                 {
                     ctx.ViewObject.SetActive(true);
@@ -802,8 +1370,6 @@ namespace YUIFramework
 
                 throw CreateLifecycleException(ctx, operation, "hide", exception);
             }
-
-            return UniTask.CompletedTask;
         }
 
         /// <summary>
@@ -812,6 +1378,15 @@ namespace YUIFramework
         /// 队列 FIFO 执行。
         /// </summary>
         internal UniTask ShowCoreAsync(BaseContext ctx, object args = null, CancellationToken cancellationToken = default)
+        {
+            return ShowCoreAsync(ctx, args, cancellationToken, false);
+        }
+
+        private UniTask ShowCoreAsync(
+            BaseContext ctx,
+            object args,
+            CancellationToken cancellationToken,
+            bool allowDuringShutdown)
         {
             EnsureInitialized();
 
@@ -824,7 +1399,7 @@ namespace YUIFramework
             return _coordinator.EnqueueAsync(
                 contextType,
                 "Show",
-                _ => ShowCoreExecuteAsync(ctx, args),
+                ct => ShowCoreExecuteAsync(ctx, args, ct, allowDuringShutdown),
                 cancellationToken);
         }
 
@@ -844,18 +1419,37 @@ namespace YUIFramework
             }
         }
 
-        private UniTask ShowCoreExecuteAsync(BaseContext ctx, object args)
+        internal async UniTask ShowForNavigationRollbackAsync(
+            BaseContext context,
+            object args)
+        {
+            if (context == null)
+            {
+                return;
+            }
+
+            using (EnterNavigationCallbackType(context.GetType()))
+            {
+                await ShowCoreAsync(context, args, CancellationToken.None, true);
+            }
+        }
+
+        private async UniTask ShowCoreExecuteAsync(
+            BaseContext ctx,
+            object args,
+            CancellationToken cancellationToken,
+            bool allowDuringShutdown)
         {
             if (ctx.State == UIContextState.Opened)
             {
-                return UniTask.CompletedTask;
+                return;
             }
 
             using var operation = BeginContextOperation(
                 ctx,
                 UIOperationKind.Show,
-                CancellationToken.None,
-                false);
+                cancellationToken,
+                allowDuringShutdown);
             try
             {
                 ctx.TransitionTo(UIContextState.Opening);
@@ -870,27 +1464,60 @@ namespace YUIFramework
                     PrepareContextRuntime(ctx);
                 }
 
+                ctx.BeginDisplayScope(args);
                 ctx.OnShow(args);
+                BlockUnderlyingInputDuringShow(ctx);
+                _configRegistry.TryGetValue(ctx.GetType(), out var config);
+                await PlayShowTransitionAsync(
+                    ctx,
+                    config,
+                    operation.Id,
+                    UITransitionRollbackState.Hidden,
+                    operation.Token);
                 ctx.TransitionTo(UIContextState.Opened);
                 ActivateContextRuntime(ctx);
+            }
+            catch (OperationCanceledException)
+            {
+                DeactivateView(ctx);
+                HideContextRuntime(ctx);
+                if (ctx.State == UIContextState.Opening)
+                {
+                    ctx.TransitionTo(UIContextState.Hidden);
+                }
+
+                var cleanupError = ctx.EndDisplayScope();
+                if (cleanupError != null)
+                {
+                    throw CreateLifecycleException(
+                        ctx,
+                        operation,
+                        "show-cancel-cleanup",
+                        cleanupError);
+                }
+
+                throw;
             }
             catch (Exception exception)
             {
                 ctx.RecordFailure(exception, false);
-                if (ctx.ViewObject != null)
-                {
-                    ctx.ViewObject.SetActive(false);
-                }
+                DeactivateView(ctx);
+                HideContextRuntime(ctx);
 
                 if (ctx.State == UIContextState.Opening)
                 {
                     ctx.TransitionTo(UIContextState.Hidden);
                 }
 
-                throw CreateLifecycleException(ctx, operation, "show", exception);
+                var cleanupError = ctx.EndDisplayScope();
+                throw CreateLifecycleException(
+                    ctx,
+                    operation,
+                    "show",
+                    cleanupError == null
+                        ? exception
+                        : new AggregateException(exception, cleanupError));
             }
-
-            return UniTask.CompletedTask;
         }
 
         private async UniTask<T> OpenExistingAsync<T>(
@@ -929,8 +1556,22 @@ namespace YUIFramework
                 context.SortingLease = _layerManager.AddToLayer(context.Layer, context.View.RectTransform);
                 PrepareContextRuntime(context);
                 context.ViewObject.SetActive(true);
+                if (stableState != UIContextState.Opened)
+                {
+                    context.BeginDisplayScope(args);
+                }
                 context.OnShow(args);
-                await PlayShowTransitionAsync(context, config, operation.Token);
+                BlockUnderlyingInputDuringShow(context);
+                await PlayShowTransitionAsync(
+                    context,
+                    config,
+                    operation.Id,
+                    stableState == UIContextState.Opened
+                        ? UITransitionRollbackState.Visible
+                        : UITransitionRollbackState.Hidden,
+                    operation.Token);
+                operation.Token.ThrowIfCancellationRequested();
+                EnsureScopeAlive(ResolveContextScope(context));
                 context.TransitionTo(UIContextState.Opened);
                 ActivateContextRuntime(context);
                 return (T)context;
@@ -985,6 +1626,7 @@ namespace YUIFramework
         private async UniTask<T> OpenPooledAsync<T>(
             UIPooledObject pooled,
             UIConfig config,
+            UIPoolScope scope,
             object args,
             CancellationToken cancellationToken)
             where T : BaseContext
@@ -1008,14 +1650,29 @@ namespace YUIFramework
                 view.Context = context;
                 context.SortingLease = _layerManager.AddToLayer(config.Layer, view.RectTransform);
                 PrepareContextRuntime(context);
+                if (IsTransitionEnabled(config) &&
+                    config.RefreshTransitionBaselineOnReuse)
+                {
+                    _transitionRunner.CaptureBaseline(view.RectTransform, true);
+                }
                 viewObject.SetActive(true);
+                context.BeginDisplayScope(args);
                 context.OnShow(args);
-                await PlayShowTransitionAsync(context, config, operation.Token);
+                BlockUnderlyingInputDuringShow(context);
+                await PlayShowTransitionAsync(
+                    context,
+                    config,
+                    operation.Id,
+                    UITransitionRollbackState.Hidden,
+                    operation.Token);
+                operation.Token.ThrowIfCancellationRequested();
+                EnsureScopeAlive(scope);
                 context.TransitionTo(UIContextState.Opened);
                 ActivateContextRuntime(context);
 
                 _activeContexts[contextType] = context;
                 _contextPrefabKeys[context] = pooled.PrefabKey;
+                _contextScopes[context] = scope;
                 return (T)context;
             }
             catch (OperationCanceledException cancellation)
@@ -1024,7 +1681,8 @@ namespace YUIFramework
                     contextType,
                     context,
                     pooled.PrefabKey,
-                    config);
+                    config,
+                    scope);
                 if (rollbackError != null)
                 {
                     var combined = new AggregateException(cancellation, rollbackError);
@@ -1051,8 +1709,125 @@ namespace YUIFramework
             }
         }
 
+        private async UniTask<UIPooledObject> CreatePrewarmedContextAsync(
+            Type contextType,
+            UIConfig config,
+            UIPoolScope scope,
+            CancellationToken cancellationToken)
+        {
+            var context = Activator.CreateInstance(contextType) as BaseContext
+                ?? throw new InvalidOperationException(
+                    $"{contextType.Name} could not be created as a BaseContext.");
+            var resourceAcquired = false;
+            var prefabKey = config.PrefabKey;
+            UIPooledObject entry = null;
+            using var operation = BeginContextOperation(
+                context,
+                UIOperationKind.Prewarm,
+                cancellationToken,
+                false);
+
+            try
+            {
+                context.TransitionTo(UIContextState.Loading);
+                GameObject instance;
+                if (_resourceService != null)
+                {
+                    var lease = await _resourceService.InstantiateAsync(
+                        UIResourceKey.Of<GameObject>(prefabKey),
+                        null,
+                        operation.Token);
+                    instance = lease.Instance;
+                    if (instance == null)
+                    {
+                        lease.Release();
+                        throw new InvalidOperationException(
+                            $"Resource service returned a null instance for {prefabKey}.");
+                    }
+
+                    _contextInstanceLeases.Add(context, lease);
+                    resourceAcquired = true;
+                }
+                else
+                {
+                    var prefab = await _resourceLoader.LoadPrefabAsync(
+                        prefabKey,
+                        operation.Token);
+                    if (prefab == null)
+                    {
+                        throw new InvalidOperationException(
+                            BuildPrefabLoadErrorMessage(
+                                contextType,
+                                config,
+                                _resourceLoader.GetType().Name,
+                                "Loader returned a null prefab."));
+                    }
+
+                    resourceAcquired = true;
+                    instance = UnityEngine.Object.Instantiate(prefab);
+                }
+
+                instance.SetActive(false);
+                var view = instance.GetComponent<UIView>() ?? instance.AddComponent<UIView>();
+                context.BindRuntime(this, config.Id, config.Layer, view, instance);
+                context.IsModal = ResolveModal(config);
+                context.CloseDisposition = UICloseDisposition.Pool;
+                view.Context = context;
+                operation.Token.ThrowIfCancellationRequested();
+                EnsureScopeAlive(scope);
+                context.TransitionTo(UIContextState.Initializing);
+                context.OnInit();
+                operation.Token.ThrowIfCancellationRequested();
+                EnsureScopeAlive(scope);
+
+                _contextPrefabKeys[context] = prefabKey;
+                _contextScopes[context] = scope;
+                context.TransitionTo(UIContextState.Pooled);
+                entry = new UIPooledObject(contextType, prefabKey, context, instance);
+                var accepted = _objectPool.TryRelease(
+                    contextType,
+                    entry,
+                    UIPoolPolicy.FromConfig(config),
+                    scope,
+                    "Prewarm",
+                    _contextInstanceLeases.ContainsKey(context),
+                    out var overflow,
+                    out var rejection);
+                if (!accepted)
+                {
+                    throw new InvalidOperationException(
+                        $"Pool rejected prewarmed {contextType.Name}: {rejection}.");
+                }
+
+                DestroyOverflow(overflow, false);
+                return entry;
+            }
+            catch (Exception original)
+            {
+                if (entry != null)
+                {
+                    _objectPool.Remove(entry);
+                }
+
+                var cleanupError = ReleaseContextInternal(
+                    context,
+                    prefabKey,
+                    resourceAcquired);
+                if (cleanupError != null)
+                {
+                    throw new AggregateException(
+                        $"Prewarm failed and cleanup also failed for {contextType.Name}.",
+                        original,
+                        cleanupError);
+                }
+
+                throw;
+            }
+        }
+
         private async UniTask<T> OpenNewAsync<T>(
             UIConfig config,
+            UIPoolScope scope,
             object args,
             CancellationToken cancellationToken)
             where T : BaseContext
@@ -1186,17 +1961,31 @@ namespace YUIFramework
                 context.SortingLease = _layerManager.AddToLayer(config.Layer, view.RectTransform);
                 PrepareContextRuntime(context);
                 context.OnInit();
+                if (IsTransitionEnabled(config))
+                {
+                    _transitionRunner.CaptureBaseline(view.RectTransform);
+                }
 
                 context.TransitionTo(UIContextState.Opening);
                 operation.Token.ThrowIfCancellationRequested();
                 instance.SetActive(true);
+                context.BeginDisplayScope(args);
                 context.OnShow(args);
-                await PlayShowTransitionAsync(context, config, operation.Token);
+                BlockUnderlyingInputDuringShow(context);
+                await PlayShowTransitionAsync(
+                    context,
+                    config,
+                    operation.Id,
+                    UITransitionRollbackState.Hidden,
+                    operation.Token);
+                operation.Token.ThrowIfCancellationRequested();
+                EnsureScopeAlive(scope);
                 context.TransitionTo(UIContextState.Opened);
                 ActivateContextRuntime(context);
 
                 _activeContexts[contextType] = context;
                 _contextPrefabKeys[context] = prefabKey;
+                _contextScopes[context] = scope;
                 return context;
             }
             catch (OperationCanceledException cancellation)
@@ -1269,14 +2058,12 @@ namespace YUIFramework
                 }
 
                 context.TransitionTo(UIContextState.Hiding);
+                ThrowDisplayCleanupError(context);
                 context.OnHide();
-                if (context.ViewObject != null)
-                {
-                    context.ViewObject.SetActive(false);
-                }
+                DeactivateView(context);
 
                 context.TransitionTo(UIContextState.Hidden);
-                _rootRuntime.Interaction.SetVisible(context, false);
+                HideContextRuntime(context);
                 return null;
             }
             catch (Exception exception)
@@ -1289,16 +2076,15 @@ namespace YUIFramework
             Type contextType,
             BaseContext context,
             string prefabKey,
-            UIConfig config)
+            UIConfig config,
+            UIPoolScope scope)
         {
             try
             {
                 context.TransitionTo(UIContextState.Hiding);
+                ThrowDisplayCleanupError(context);
                 context.OnHide();
-                if (context.ViewObject != null)
-                {
-                    context.ViewObject.SetActive(false);
-                }
+                DeactivateView(context);
 
                 context.TransitionTo(UIContextState.Hidden);
                 ReleaseContextRuntime(context);
@@ -1316,8 +2102,22 @@ namespace YUIFramework
                         contextType,
                         rollbackEntry,
                         rollbackPolicy,
-                        out var overflow))
+                        scope,
+                        "OpenRollback",
+                        _contextInstanceLeases.ContainsKey(context),
+                        out var overflow,
+                        out _))
                 {
+                    try
+                    {
+                        DestroyOverflow(overflow, false);
+                    }
+                    catch
+                    {
+                        _objectPool.Remove(rollbackEntry);
+                        throw;
+                    }
+
                     context.TransitionTo(UIContextState.Pooled);
                     return null;
                 }
@@ -1334,7 +2134,7 @@ namespace YUIFramework
             }
         }
 
-        private static Exception TryRollbackNewOpen(BaseContext context)
+        private Exception TryRollbackNewOpen(BaseContext context)
         {
             if (context.State != UIContextState.Opening)
             {
@@ -1344,11 +2144,9 @@ namespace YUIFramework
             try
             {
                 context.TransitionTo(UIContextState.Hiding);
+                ThrowDisplayCleanupError(context);
                 context.OnHide();
-                if (context.ViewObject != null)
-                {
-                    context.ViewObject.SetActive(false);
-                }
+                DeactivateView(context);
 
                 context.TransitionTo(UIContextState.Hidden);
                 context.CloseDisposition = UICloseDisposition.Release;
@@ -1505,6 +2303,11 @@ namespace YUIFramework
             }
 
             var errors = new List<Exception>();
+            if (context.View != null && context.View.RectTransform != null)
+            {
+                _transitionRunner?.Forget(context.View.RectTransform);
+            }
+
             try
             {
                 ReleaseContextRuntime(context);
@@ -1574,6 +2377,7 @@ namespace YUIFramework
             }
 
             _contextPrefabKeys.Remove(context);
+            _contextScopes.Remove(context);
             if (errors.Count == 0)
             {
                 return null;
@@ -1843,33 +2647,75 @@ namespace YUIFramework
         private async UniTask PlayShowTransitionAsync(
             BaseContext context,
             UIConfig config,
+            UIOperationId operationId,
+            UITransitionRollbackState rollbackState,
             CancellationToken cancellationToken)
         {
-            if (context?.View?.RectTransform == null || !IsTransitionEnabled(config))
+            if (context == null ||
+                context.View == null ||
+                context.View.RectTransform == null ||
+                !IsTransitionEnabled(config))
             {
                 return;
             }
 
-            await _transitionRunner.PlayShowAsync(
-                context.View.RectTransform,
-                config.ToTransitionOptions(),
-                cancellationToken);
+            var type = context.GetType();
+            _transitioningContexts[type] = context;
+            try
+            {
+                await _transitionRunner.PlayShowAsync(
+                    context.View.RectTransform,
+                    config.ToTransitionOptions(),
+                    operationId,
+                    rollbackState,
+                    type,
+                    IsNavigationCallbackType(type),
+                    cancellationToken);
+            }
+            finally
+            {
+                if (_transitioningContexts.TryGetValue(type, out var active) &&
+                    ReferenceEquals(active, context))
+                {
+                    _transitioningContexts.Remove(type);
+                }
+            }
         }
 
         private async UniTask PlayHideTransitionAsync(
             BaseContext context,
             UIConfig config,
+            UIOperationId operationId,
             CancellationToken cancellationToken)
         {
-            if (context?.View?.RectTransform == null || !IsTransitionEnabled(config))
+            if (context == null ||
+                context.View == null ||
+                context.View.RectTransform == null ||
+                !IsTransitionEnabled(config))
             {
                 return;
             }
 
-            await _transitionRunner.PlayHideAsync(
-                context.View.RectTransform,
-                config.ToTransitionOptions(),
-                cancellationToken);
+            var type = context.GetType();
+            _transitioningContexts[type] = context;
+            try
+            {
+                await _transitionRunner.PlayHideAsync(
+                    context.View.RectTransform,
+                    config.ToTransitionOptions(),
+                    operationId,
+                    type,
+                    IsNavigationCallbackType(type),
+                    cancellationToken);
+            }
+            finally
+            {
+                if (_transitioningContexts.TryGetValue(type, out var active) &&
+                    ReferenceEquals(active, context))
+                {
+                    _transitioningContexts.Remove(type);
+                }
+            }
         }
 
         private static bool IsTransitionEnabled(UIConfig config)
@@ -1891,9 +2737,23 @@ namespace YUIFramework
                 return;
             }
 
+            context.SetRuntimeVisibility(true);
             _rootRuntime.Interaction.SetVisible(context, true);
             _rootRuntime.Focus.Activate(context);
             _rootRuntime.Modals.Activate(context);
+        }
+
+        private void BlockUnderlyingInputDuringShow(BaseContext context)
+        {
+            if (context == null ||
+                context.ViewObject == null ||
+                !context.IsModal)
+            {
+                return;
+            }
+
+            _rootRuntime.Modals.Activate(context);
+            _rootRuntime.Interaction.Apply();
         }
 
         private void PrepareContextRuntime(BaseContext context)
@@ -1903,6 +2763,7 @@ namespace YUIFramework
                 return;
             }
 
+            context.SetRuntimeVisibility(false);
             _rootRuntime.Interaction.SetVisible(context, false);
         }
 
@@ -1914,6 +2775,7 @@ namespace YUIFramework
             }
 
             _rootRuntime.Modals.Deactivate(context);
+            context.SetRuntimeVisibility(false);
             _rootRuntime.Interaction.SetVisible(context, false);
             _rootRuntime.Focus.Deactivate(context);
         }
@@ -1928,9 +2790,167 @@ namespace YUIFramework
             _rootRuntime.Modals.Deactivate(context);
             _rootRuntime.Interaction.Remove(context);
             _rootRuntime.Focus.Deactivate(context);
+            context.ClearVisibility();
             context.SortingLease?.Dispose();
             context.SortingLease = null;
             _rootRuntime.Modals.Apply();
+        }
+
+        internal void SetNavigationCoverage(
+            BasePageContext context,
+            bool covered)
+        {
+            if (context == null)
+            {
+                return;
+            }
+
+            var suspended =
+                covered &&
+                _configRegistry.TryGetValue(context.GetType(), out var config) &&
+                config.SuspendWhenCovered;
+            context.SetNavigationVisibility(covered, suspended);
+            _rootRuntime?.Interaction.Apply();
+        }
+
+        private void DeactivateView(BaseContext context)
+        {
+            if (context == null || context.ViewObject == null)
+            {
+                return;
+            }
+
+            context.ViewObject.SetActive(false);
+            NormalizeTransitionVisual(context);
+        }
+
+        private void NormalizeTransitionVisual(BaseContext context)
+        {
+            if (context != null &&
+                context.View != null &&
+                context.View.RectTransform != null)
+            {
+                _transitionRunner?.NormalizeVisible(context.View.RectTransform);
+            }
+        }
+
+        private void FinalizeInvalidPooledObject(UIPooledObject pooledObject)
+        {
+            if (pooledObject == null)
+            {
+                return;
+            }
+
+            Debug.LogWarning(
+                $"[UIManager] Finalizing externally destroyed pooled context " +
+                $"{pooledObject.ContextType.Name} ({pooledObject.EntryId}).");
+            DestroyPooledObject(pooledObject);
+        }
+
+        private void DestroyOverflow(
+            UIPooledObject overflow,
+            bool allowDuringShutdown)
+        {
+            if (overflow != null)
+            {
+                DestroyPooledObject(overflow, allowDuringShutdown);
+            }
+        }
+
+        private static void ThrowDisplayCleanupError(BaseContext context)
+        {
+            var cleanupError = context?.EndDisplayScope();
+            if (cleanupError != null)
+            {
+                throw cleanupError;
+            }
+        }
+
+        private UIPoolScope NormalizeScope(UIPoolScope scope)
+        {
+            return scope.Kind == UIPoolScopeKind.Global
+                ? UIPoolScope.Global
+                : scope;
+        }
+
+        private UIPoolScope ResolveContextScope(BaseContext context)
+        {
+            return context != null && _contextScopes.TryGetValue(context, out var scope)
+                ? scope
+                : UIPoolScope.Global;
+        }
+
+        private bool IsScopeAlive(UIPoolScope scope)
+        {
+            scope = NormalizeScope(scope);
+            return scope.Kind == UIPoolScopeKind.Global ||
+                   (_poolScopes.TryGetValue(scope.Id, out var state) && !state.Ended);
+        }
+
+        private void EnsureScopeAlive(UIPoolScope scope)
+        {
+            if (!scope.IsValid)
+            {
+                throw new ArgumentException("A valid UI pool scope is required.", nameof(scope));
+            }
+
+            if (!IsScopeAlive(scope))
+            {
+                throw new InvalidOperationException(
+                    $"UI pool scope has ended and cannot accept work: {scope}.");
+            }
+        }
+
+        private CancellationToken GetScopeServiceToken(UIPoolScope scope)
+        {
+            scope = NormalizeScope(scope);
+            if (scope.Kind == UIPoolScopeKind.Global)
+            {
+                return _serviceLifetimeCancellation.Token;
+            }
+
+            EnsureScopeAlive(scope);
+            return _poolScopes[scope.Id].Token;
+        }
+
+        private void OnApplicationLowMemory()
+        {
+            if (!_initialized || _shuttingDown)
+            {
+                return;
+            }
+
+            try
+            {
+                HandleLowMemory();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+        }
+
+        private void OnSceneUnloaded(Scene scene)
+        {
+            if (!_initialized || !_sceneScopes.TryGetValue(scene.handle, out var scope))
+            {
+                return;
+            }
+
+            _sceneScopes.Remove(scene.handle);
+            ReleaseScopeAsync(scope).Forget(Debug.LogException);
+        }
+
+        private static void AddFlattened(List<Exception> errors, Exception exception)
+        {
+            if (exception is AggregateException aggregate)
+            {
+                errors.AddRange(aggregate.Flatten().InnerExceptions);
+            }
+            else
+            {
+                errors.Add(exception);
+            }
         }
 
         private sealed class NavigationCallbackScope : IDisposable
@@ -1954,6 +2974,50 @@ namespace YUIFramework
 
                 _owner = null;
                 owner.ExitNavigationCallbackType(_contextType);
+            }
+        }
+
+        private sealed class PoolScopeState : IDisposable
+        {
+            private readonly CancellationTokenSource _cancellation;
+
+            public PoolScopeState(
+                UIPoolScope scope,
+                CancellationToken serviceLifetimeToken)
+            {
+                Scope = scope;
+                _cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                    serviceLifetimeToken);
+            }
+
+            public UIPoolScope Scope { get; }
+            public CancellationToken Token => _cancellation.Token;
+            public bool Ended { get; private set; }
+
+            public void End()
+            {
+                if (Ended)
+                {
+                    return;
+                }
+
+                Ended = true;
+                if (!_cancellation.IsCancellationRequested)
+                {
+                    _cancellation.Cancel();
+                }
+            }
+
+            public void Dispose()
+            {
+                try
+                {
+                    End();
+                }
+                finally
+                {
+                    _cancellation.Dispose();
+                }
             }
         }
     }

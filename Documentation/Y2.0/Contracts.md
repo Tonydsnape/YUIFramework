@@ -148,3 +148,33 @@ that wait. Reset and shutdown cancel and drain the underlying run.
 `BootstrapReadyContext`. Business entry is impossible before resource verification and code
 loader success. A verified local/built-in fallback is marked degraded and never represented
 as the latest remote version. See [Bootstrap.md](Bootstrap.md).
+
+## Pooling and memory governance
+
+Stage 7 distinguishes resource preload from initialized-instance prewarm. The former leaves
+an unreferenced native asset cache; `UIManager.PrewarmAsync<T>` consumes
+`UIConfig.PreloadCount` and creates distinct hidden contexts that retain explicit instance
+leases. Prewarm/Open/Close share the same per-type FIFO lane.
+
+Pool entries are claimed by one pool and carry type/key, scope, priority, monotonic LRU age,
+and lease-source identity. Duplicate, cross-pool, mismatched, and destroyed returns are
+rejected and diagnosed. Per-key and global limits, idle expiry, priority/LRU eviction,
+scene/module/global scopes, low-memory cleanup, and read-only snapshots are defined in
+[Pooling.md](Pooling.md).
+
+`LifetimeToken` remains permanent for the initialized context. A separate `DisplayToken`
+owns framework-tracked display tasks, input locks, subscriptions, and temporary bindings;
+pooling cancels only that display scope and preserves permanent initialization state.
+
+## Transitions and visibility
+
+Stage 8 adds `IUIService.Transitions`, `RequestTransitionInterruption`, and
+`RefreshTransitionBaseline`. Built-in transitions use one generation-fenced writer per
+view and preserve captured alpha, scale, and anchored-position baselines. Default operation
+ordering remains FIFO; interrupt/reverse/skip affect only the active visual await and leave
+lifecycle rollback/commit on the existing lane.
+
+`BaseContext.VisibilityState` exposes orthogonal `Visible`, `Interactable`, `Covered`, and
+`Suspended` flags. `UIInteractionController` remains the sole raycast authority.
+`WaitUntilResumedAsync` gates framework-managed display work and is linked to display and
+lifetime cancellation. See [Transitions.md](Transitions.md).

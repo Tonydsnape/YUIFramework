@@ -123,6 +123,7 @@ namespace YUIFramework
         public UniTask<T> EnqueueOpenAsync<T>(
             object key,
             object args,
+            object mergeIdentity,
             bool mayCreateNew,
             Func<Action, CancellationToken, UniTask<T>> work,
             CancellationToken callerToken,
@@ -139,7 +140,11 @@ namespace YUIFramework
             {
                 ThrowIfStoppedLocked(operationName);
                 if (_lanes.TryGetValue(key, out var existingLane) &&
-                    TryGetMergeCandidate(existingLane, args, out attach))
+                    TryGetMergeCandidate(
+                        existingLane,
+                        args,
+                        mergeIdentity,
+                        out attach))
                 {
                     attach.WaiterCount++;
                 }
@@ -151,6 +156,7 @@ namespace YUIFramework
                         CancellationTokenSource.CreateLinkedTokenSource(serviceToken))
                     {
                         Args = args,
+                        MergeIdentity = mergeIdentity,
                         MergeEligible = mayCreateNew,
                         WaiterCount = 1
                     };
@@ -388,7 +394,11 @@ namespace YUIFramework
             return left.Equals(right);
         }
 
-        private static bool TryGetMergeCandidate(Lane lane, object args, out Node candidate)
+        private static bool TryGetMergeCandidate(
+            Lane lane,
+            object args,
+            object mergeIdentity,
+            out Node candidate)
         {
             candidate = lane.Running;
             if (candidate == null && lane.Pending.Count == 1)
@@ -402,7 +412,8 @@ namespace YUIFramework
                 candidate.SharedCancellation.IsCancellationRequested ||
                 lane.Pending.Count > (ReferenceEquals(candidate, lane.Running) ? 0 : 1) ||
                 candidate.Tcs.Task.IsCompleted ||
-                !ArgsEqual(candidate.Args, args))
+                !ArgsEqual(candidate.Args, args) ||
+                !ArgsEqual(candidate.MergeIdentity, mergeIdentity))
             {
                 candidate = null;
                 return false;
@@ -434,6 +445,7 @@ namespace YUIFramework
             public object Key { get; }
             public CancellationToken CallerToken { get; }
             public object Args { get; set; }
+            public object MergeIdentity { get; set; }
             public bool MergeEligible { get; set; }
             public int WaiterCount { get; set; }
             public CancellationTokenSource SharedCancellation { get; }

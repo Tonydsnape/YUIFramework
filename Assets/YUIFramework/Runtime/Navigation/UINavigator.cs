@@ -105,6 +105,11 @@ namespace YUIFramework
 
         public void Clear()
         {
+            foreach (var entry in _pageStack)
+            {
+                _uiManager.SetNavigationCoverage(entry.Page, false);
+            }
+
             _pageStack.Clear();
         }
 
@@ -241,6 +246,7 @@ namespace YUIFramework
                     // the refreshed instance.
                     var refreshed = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken);
                     ReplaceTopEntry(refreshed, args);
+                    ApplyStackVisibility();
                     return refreshed;
                 }
 
@@ -252,12 +258,14 @@ namespace YUIFramework
             {
                 if (currentEntry != null)
                 {
+                    _uiManager.SetNavigationCoverage(currentEntry.Page, true);
                     await _uiManager.HideForNavigationAsync(currentEntry.Page, cancellationToken);
                     hidCurrent = true;
                 }
 
                 var page = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken);
                 _pageStack.Add(CreateEntry(page, args));
+                ApplyStackVisibility();
                 return page;
             }
             catch (Exception original)
@@ -297,12 +305,22 @@ namespace YUIFramework
 
             // Non-destructive-first: show the previous page before destructively
             // closing the current one, so a failed show never touches the current page.
-            await _uiManager.ShowForNavigationAsync(previousEntry.Page, args, cancellationToken);
+            try
+            {
+                await _uiManager.ShowForNavigationAsync(previousEntry.Page, args, cancellationToken);
+                _uiManager.SetNavigationCoverage(previousEntry.Page, false);
+            }
+            catch
+            {
+                ApplyStackVisibility();
+                throw;
+            }
 
             try
             {
                 await _uiManager.CloseForNavigationAsync(currentEntry.Page, cancellationToken);
                 _pageStack.RemoveAt(_pageStack.Count - 1);
+                ApplyStackVisibility();
                 return previousEntry.Page;
             }
             catch (Exception original)
@@ -365,6 +383,7 @@ namespace YUIFramework
             {
                 var refreshed = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken);
                 ReplaceTopEntry(refreshed, args);
+                ApplyStackVisibility();
                 return refreshed;
             }
 
@@ -398,6 +417,7 @@ namespace YUIFramework
                 }
 
                 _pageStack.Add(CreateEntry(opened, args));
+                ApplyStackVisibility();
                 return opened;
             }
             catch (Exception original)
@@ -444,12 +464,14 @@ namespace YUIFramework
                 {
                     if (currentEntry != null)
                     {
+                        _uiManager.SetNavigationCoverage(currentEntry.Page, true);
                         await _uiManager.HideForNavigationAsync(currentEntry.Page, cancellationToken);
                         hidCurrent = true;
                     }
 
                     var page = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken);
                     _pageStack.Add(CreateEntry(page, args));
+                    ApplyStackVisibility();
                     return page;
                 }
                 catch (Exception original)
@@ -493,7 +515,16 @@ namespace YUIFramework
 
             // Non-destructive-first: show the target before destructively closing the
             // pages that were stacked above it.
-            await _uiManager.ShowForNavigationAsync(existingEntry.Page, args, cancellationToken);
+            try
+            {
+                await _uiManager.ShowForNavigationAsync(existingEntry.Page, args, cancellationToken);
+                _uiManager.SetNavigationCoverage(existingEntry.Page, false);
+            }
+            catch
+            {
+                ApplyStackVisibility();
+                throw;
+            }
 
             var errors = new List<Exception>();
             foreach (var entry in above)
@@ -515,8 +546,14 @@ namespace YUIFramework
             // target actually is now. A page above the target that failed to close is
             // dropped from the tracked stack rather than fabricated back in.
             var existingPage = (T)existingEntry.Page;
+            foreach (var dropped in above)
+            {
+                _uiManager.SetNavigationCoverage(dropped.Page, false);
+            }
+
             _pageStack.RemoveRange(existingIndex, _pageStack.Count - existingIndex);
             _pageStack.Add(CreateEntry(existingPage, args));
+            ApplyStackVisibility();
 
             var reconcileError = TryReconcileStack();
             if (reconcileError != null)
@@ -557,6 +594,7 @@ namespace YUIFramework
                     }
                 }
 
+                ApplyStackVisibility();
                 return null;
             }
             catch (Exception exception)
@@ -569,7 +607,7 @@ namespace YUIFramework
         {
             try
             {
-                await _uiManager.ShowForNavigationAsync(page, args, CancellationToken.None);
+                await _uiManager.ShowForNavigationRollbackAsync(page, args);
                 return null;
             }
             catch (Exception exception)
@@ -582,7 +620,7 @@ namespace YUIFramework
         {
             try
             {
-                await _uiManager.HideForNavigationAsync(page, CancellationToken.None);
+                await _uiManager.HideForNavigationRollbackAsync(page);
                 return null;
             }
             catch (Exception exception)
@@ -607,6 +645,16 @@ namespace YUIFramework
         private static bool IsRetired(UIContextState state)
         {
             return state == UIContextState.Released || state == UIContextState.Pooled;
+        }
+
+        private void ApplyStackVisibility()
+        {
+            for (var index = 0; index < _pageStack.Count; index++)
+            {
+                _uiManager.SetNavigationCoverage(
+                    _pageStack[index].Page,
+                    index < _pageStack.Count - 1);
+            }
         }
 
         private static Exception Combine(Exception original, params Exception[] extra)

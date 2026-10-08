@@ -31,10 +31,21 @@ namespace YUIFramework.Examples
                     PrefabKey = "SampleHelloPage",
                     Layer = UILayer.Normal,
                     CacheOnClose = true,
-                    MaxPoolSize = 1,
-                    FullScreen = true
+                    MaxPoolSize = 2,
+                    PreloadCount = 2,
+                    PoolPriority = 10,
+                    PoolIdleTimeoutSeconds = 120,
+                    FullScreen = true,
+                    UseTransition = true,
+                    TransitionType = UITransitionType.Fade,
+                    ShowDuration = 0.2f,
+                    HideDuration = 0.15f,
+                    IgnoreTransitionTimeScale = true,
+                    SuspendWhenCovered = true
                 });
 
+                await _uiService.PrewarmRegisteredAsync(
+                    cancellationToken: cancellationToken);
                 await _uiService.Navigator.PushAsync<SampleHelloPage>(
                     "Hello YUIFramework Y2!",
                     cancellationToken: cancellationToken);
