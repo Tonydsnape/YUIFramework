@@ -140,3 +140,9 @@ generation is forgotten on terminal release, and prewarm never starts a visual t
 Stage 9 keeps owned or external ViewModels and lifetime bindings attached while an instance
 is idle. Every display subscription/binding is removed before return. Terminal eviction
 disposes owned ViewModels only; borrowed ViewModels remain caller-owned.
+
+Stage 10 native list items belong exclusively to the SuperScrollView pool, not this context
+pool. A lifetime-tracked list may retain inactive native items and a prefab asset lease while
+its context is pooled, but every display item binding/subscription is ended. Idle-context
+eviction disposes the list before returning context ownership. A display-tracked list instead
+destroys its native pool on every close. See [Virtualization.md](Virtualization.md).

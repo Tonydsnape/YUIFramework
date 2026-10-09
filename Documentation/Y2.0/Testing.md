@@ -142,6 +142,77 @@ The binding regression enforces a 4,096-byte total budget to tolerate bounded Un
 bookkeeping while rejecting per-update allocation. These measurements exclude subscription
 mutation, formatting strings, other Unity controls, device profiling, and frame-rate claims.
 
+## Stage 10 acceptance
+
+Unity `2022.3.62f2`, Editor/Mono, post-review gates on 2026-10-09. Each row has zero
+failed/skipped/inconclusive tests. Times are the XML `test-run` UTC interval, not process
+startup/shutdown times. All files are retained under:
+
+`C:\Users\21093\.copilot\session-state\7310900a-0fd1-4a43-bd14-c674e24903bf\files`
+
+| Suite | Passed | UTC interval | XML file |
+|---|---:|---|---|
+| Directed core EditMode | 4/4 | 03:05:28 | `phase10-final-directed-rerun-editmode.xml` |
+| Directed real-plugin PlayMode | 15/15 | 03:05:44-03:05:48 | `phase10-final-directed-rerun-playmode.xml` |
+| Full installed EditMode | 164/164 | 03:09:33-03:09:36 | `phase10-final-editmode.xml` |
+| Full installed PlayMode | 148/148 | 03:09:51-03:10:08 | `phase10-final-playmode.xml` |
+| No-vendor full EditMode | 164/164 | 03:07:49-03:07:52 | `phase10-no-vendor-final-editmode.xml` |
+| No-vendor full PlayMode | 133/133 | 03:10:23-03:10:37 | `phase10-no-vendor-final-playmode.xml` |
+
+Each matching `.log` has zero C# warning/error, compilation-failure, `Unobserved`, or
+`NullReference` diagnostics. The full PlayMode runs intentionally log the existing duplicate
+EventSystem warning in `DuplicateRuntimeAndEventSystem_AreRejectedDeterministically`.
+A fresh compilation had exposed an obsolete-facade warning in the legacy HotUpdate
+cancellation regression; a narrowly scoped CS0618 suppression now documents that deliberate
+compatibility call, without disabling warnings globally.
+
+The installed project is `files\phase10-validation-project`; the no-vendor project is
+`files\phase10-no-vendor-project`. Both contain actual `Assets`, `Packages`, and
+`ProjectSettings` roots. The user-owned interactive editor was not terminated. Full source
+and validation-copy SHA256 manifests were compared after execution:
+
+| Evidence pair (in the same artifacts directory) | Files | Result |
+|---|---:|---|
+| `phase10-validation-source-sha256.txt` / `phase10-validation-copy-sha256.txt` | 462 | 0 missing/mismatched/extra, including local vendor |
+| `phase10-no-vendor-source-sha256.txt` / `phase10-no-vendor-copy-sha256.txt` | 394 | 0 missing/mismatched/extra, excludes optional installation |
+| `phase10-vendor-source-sha256.txt` / `phase10-vendor-installed-sha256.txt` | 35 | 14 C# runtime scripts plus version/metas; supplier files unchanged |
+| `phase10-adapter-source-sha256.txt` / `phase10-adapter-installed-sha256.txt` | 28 | Original adapter/example/tests/assembly templates match compiled copies |
+
+`phase10-validation-comparison.txt` records paths, counts, git HEAD, and the preserved
+`.gitignore` hash. Five newly generated, local-only folder metas were copied from validation
+to the previously meta-less installation to preserve their GUIDs; no code was changed to
+produce parity. Keep the projects and manifests until acceptance is independently verified.
+
+`Stage10ListContractsTests` pins duplicate rejection, stable selection, mutation-error
+aggregation/reentrancy, binding generation, and actionable missing-plugin failure.
+`SuperScrollViewPlayModeTests` drives the actual installed native backend. It covers:
+
+- 10,000 rows, scroll targets every 137 indices, bounded native items and correct data:
+  vertical 29 created / 17 bound, horizontal 15 / 9, Grid 52 / 52 at the final sample.
+- Replace-only local refresh, insert/remove/move/reset/clear, stable selection and anchor
+  offset, Grid positions, dynamic horizontal/vertical sizes and end-of-list scrolling.
+- Delayed/noncooperative sprite results, A-to-B reuse, offscreen/hide/external destruction,
+  caller cancellation while loading the prefab, real Image/Sprite and service lease counts,
+  zero outstanding leases and zero duplicate native releases at teardown.
+- 1,000 direct displays (20 created, zero bound after hide), plus 1,000 actual UIManager
+  pooled open/close cycles, navigation suspension/resume, canceled close, and shutdown.
+- Error recovery and per-item aggregate cleanup; real EventSystem touch rebasing,
+  parent/child direction arbitration, native List/Grid drag-end cleanup and input denial.
+
+The focused read-only review found and fixed four issues: copied native rebase events
+replaced touch identity; routing/disable omitted native drag co-handlers; temporary-pool
+legacy rebind skipped unbind; one throwing cancellation callback interrupted suspension
+cleanup. Their regressions pass without modifying the vendor kernel.
+
+Allocation measurement uses `GC.GetAllocatedBytesForCurrentThread` after 100 warmup scrolls.
+The real native-plus-adapter `ScrollTo` path allocated **0 bytes / 100 calls**, retaining
+29 native items before/after; continuous content movement plus `UpdateListView` allocated
+**0 bytes / 200 steps**, still 29 created. Each interval enforces a **4,096-byte total
+budget**, excludes assertions/object construction, and has no sprite binder (zero sprite
+leases). These are measured synchronous hot-path batches, not whole rendered frames:
+player-loop/test-runner and deferred uGUI rebuild allocations, label formatting, async
+loading/CTS, device profiling and 60 FPS claims are explicitly excluded.
+
 ## Characterization-test rule
 
 Phase 0 tests freeze observable Y1 behavior. A later phase may intentionally change that behavior only when it:

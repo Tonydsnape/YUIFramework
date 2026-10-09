@@ -150,3 +150,14 @@ Owned ViewModels are disposed on replacement or terminal release. External ViewM
 borrowed and never disposed by UI lifecycle cleanup. Message, binding, command, and
 ViewModel cleanup attempts every item and aggregates errors without skipping later owners.
 See [Messaging.md](Messaging.md) and [MVVM.md](MVVM.md).
+
+## Stage 10 list display and item lifetimes
+
+`TrackDisplayBinding(list.BeginDisplay(this))` ties native list updates, source/selection
+subscriptions, and item generations to the existing display boundary. Track the list itself
+with `TrackBinding` to retain its native pool until terminal release, or with
+`TrackDisplayBinding` to destroy it at every display end. Neither choice changes FIFO,
+transition rollback, or ViewModel ownership. Suspension cancels item work and drag state,
+then restores the stable anchor and rebinds on resume. Canceled close keeps the live display.
+Dispose the list before shutting down its caller-owned resource service. See
+[Virtualization.md](Virtualization.md).

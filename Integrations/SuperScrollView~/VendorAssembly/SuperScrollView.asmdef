@@ -1,0 +1,5 @@
+{
+  "name": "SuperScrollView",
+  "references": ["Unity.ugui"],
+  "autoReferenced": false
+}

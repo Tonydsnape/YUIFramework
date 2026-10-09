@@ -9,5 +9,7 @@ namespace YUIFramework
         Remove,
         Clear,
         Reset,
+        Replace,
+        Move,
     }
 }

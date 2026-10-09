@@ -25,6 +25,10 @@ This matrix records intent before implementation. Final Y2 names may be refined 
 | Owner-only message cleanup | `UIMessageScope` or context lifetime/display helpers | Owner removal retained for the compatibility window |
 | Ad-hoc button callbacks | `UICommand` / `UIAsyncCommand` + `UIDataBinding.BindButton` | Awaitable failures/cancellation and CanExecute are now explicit |
 | Mutable-only observable property | `IReadOnlyObservableProperty<T>` / `IObservableProperty<T>` / `ValidatedProperty<T>` | `ObservableProperty<T>` implements the new interfaces |
+| `UIVirtualList` standalone fixed-size kernel | Optional `SuperScrollViewList<T>` commercial List/Grid backend | Obsolete facade forwards to the installed adapter; no fallback kernel or hard vendor dependency |
+| Index-only item binding | `UIListDataSource<T>` + stable IDs + `UIListItemBinding` | Generation/token fences and asset-lease cleanup are required for async item results |
+| Collection add/remove/reset only | `Insert`, `Replace`, `Move`, precommit validation, postcommit aggregate notifications | Reentrant collection mutation is rejected; duplicate list IDs fail before commit |
+| Legacy list padding/end alignment | Parent viewport padding / typed leading scroll offset | Unsupported legacy options throw; see `Virtualization.md` |
 | Context-owned ViewModel by assumption | `SetViewModel(vm, UIViewModelOwnership)` | Default remains `Owned`; borrowed instances opt into `External` |
 | `Task` runtime APIs | `UniTask` + `CancellationToken` | Runtime migration implemented |
 | Mutable `UIConfig` fields | Validated descriptor/config asset | Import/conversion helper |

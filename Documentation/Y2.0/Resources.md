@@ -175,6 +175,14 @@ YooAsset bootstrap backend destroys packages only after every resource handle is
 
 ## Test coverage
 
+Stage 10's optional SuperScrollView adapter leases the **prefab asset**, not each native
+item instance: the supplier pool performs its own Instantiate/Destroy. The list retains that
+lease through destruction of every item and the private template. Generation-fenced sprite
+bindings own their own asset leases, release late results, and clear on reuse/hide/disposal.
+No item enters UIManager's context pool, and the adapter never shuts down the borrowed
+resource service. Unexpected external root destruction defers prefab release one frame;
+normal owner-driven disposal is synchronous. See [Virtualization.md](Virtualization.md).
+
 `ResourceOwnershipEditModeTests` covers keys and the package registry.
 `ResourceOwnershipPlayModeTests` covers single-flight, per-waiter cancellation, abandoned-load
 release, package/location/type separation, unknown packages, asset/instance separation and

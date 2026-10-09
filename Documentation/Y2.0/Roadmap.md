@@ -2,7 +2,7 @@
 
 Y2.0 uses one development line and advances through strict stage gates. Only one stage is implemented at a time. Code, tests, documentation, and acceptance must be complete before the next stage begins.
 
-**Progress: stage 8 complete (9 of 17 stages). Stage 9 has not started.**
+**Progress: stages 0-10 complete (11 of 17 stages). Stage 11 has not started.**
 
 ## Fixed decisions
 
@@ -28,8 +28,8 @@ Y2.0 uses one development line and advances through strict stage gates. Only one
 | 6 (complete) | Resource-update bootstrap | EditorSimulate/Offline/Host, weak network, fallback, reset, and update failures have deterministic outcomes |
 | 7 (complete) | Pooling and memory governance | Preload, capacity, LRU, scopes, low-memory eviction, and lease release are complete |
 | 8 (complete) | Interruptible transitions and visibility | Show/hide can be canceled or reversed without stale writes, transform, alpha, input, or navigation residue |
-| 9 | Messaging and MVVM lifecycle | Typed messages, scoped subscriptions, commands, common bindings, cancellation, and pooling are safe |
-| 10 | Commercial virtual list | Grid/dynamic size/incremental changes/async item binding support 10,000-item scenarios without full instantiation |
+| 9 (complete) | Messaging and MVVM lifecycle | Typed messages, scoped subscriptions, commands, common bindings, cancellation, and pooling are safe |
+| 10 (complete) | Commercial virtual list | Licensed SuperScrollView List/Grid, dynamic List sizes, stable-ID changes/anchors, async leases, nested drag, and 10,000-row/no-vendor gates pass; see Virtualization.md and Testing.md |
 | 11 | Mobile adaptation, localization, and themes | Safe area, aspect ratios, runtime language/theme refresh, fonts, and missing-content checks work |
 | 12 | Scene and system UI services | UI scopes, scene cleanup, reference-counted loading, Toast throttling, and Dialog results are stable |
 | 13 | Diagnostics and performance budgets | Runtime state, ownership, operations, leaks, timings, and uGUI cost can be inspected |

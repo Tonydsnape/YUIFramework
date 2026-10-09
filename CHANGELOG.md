@@ -81,8 +81,18 @@ All notable changes to YUIFramework are documented in this file.
   dispatch-error aggregation, and allocation-free steady-state typed publish.
 - Awaitable sync/async commands, validation/read-only observable contracts, owned/external
   ViewModel policy, and code-first uGUI/TextMeshPro bindings for common controls.
+- Stage 10 optional SuperScrollView 2.5.3 integration: locally installed licensed runtime,
+  original List/Grid adapter, stable-ID selection, collection mutations and anchor
+  preservation, dynamic List sizing, generation-fenced sprite leases, and Context-owned
+  display/suspension cleanup. No commercial supplier sources are included for redistribution.
+- Native-aware nested drag routing with paired cancellation and touch-safe layout rebasing,
+  10,000-row examples/tests, and bounded real-scroll allocation measurements.
 
 ### Changed
+
+- `UIVirtualList` is an obsolete forwarding facade over the installed commercial adapter;
+  its separate kernel is removed. Missing installation and unsupported legacy layout
+  options fail explicitly. See `Documentation/Y2.0/Virtualization.md`.
 
 - Documentation now identifies Unity `2022.3.62f2` as the verified project baseline.
 - Runtime, navigation, resource, and transition asynchronous APIs now use UniTask and `CancellationToken`.

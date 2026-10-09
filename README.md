@@ -45,7 +45,7 @@ Y2.0 正在按阶段建立商用基线。阶段 0 到阶段 6 已完成：除阶
 - 核心调度器（`UIManager`）
 - Page 栈导航（`Push / Pop / Replace / Back`）
 - UI 缓存池（`CacheOnClose` + `MaxPoolSize`）
-- 轻量虚拟列表（`UIVirtualList`，固定尺寸 item 复用）
+- 可选商业虚拟列表（SuperScrollView 2.5.3，纵横列表、动态尺寸与固定 Grid；需本地合法安装）
 - 轻量转场动画（Fade / Scale / Slide）
 - 轻量 MVVM（`ObservableProperty` + `UIDataBinding`）
 - 纯代码示例（无需提交 prefab / scene 二进制资源）
@@ -297,34 +297,19 @@ private void OnCoinChanged(int value)
 
 ## P6 虚拟列表 / 大量 UI 元素优化
 
-P6 新增 `Runtime/VirtualList`，用于背包、邮件、排行榜、任务列表等大数据量 UI 场景，避免一次性创建大量 Item。
+Y2.0 阶段10已将旧 `UIVirtualList` 内核替换为可选 **SuperScrollView 2.5.3**
+适配器。旧类型为 Obsolete 转发 facade，不再维护第二套内核；未安装插件时基础框架
+仍可编译，但调用列表 facade 会明确提示安装。
 
-基础用法：
+新接入使用 `UIListDataSource<T>`、稳定 ID 的 `UIListSelection` 和
+`SuperScrollViewList<T>`，支持纵向/横向列表、动态列表尺寸、固定 Grid、增删改移与
+anchor 保持、带 generation 和资源租约的异步图片绑定。显示期清理由
+`TrackDisplayBinding(list.BeginDisplay(this))` 接入现有 Context 生命周期。
 
-```csharp
-public sealed class MailPage : BasePageContext, IUIVirtualListDataSource
-{
-    private UIVirtualList _list;
-
-    protected override void HandleInit()
-    {
-        _list.SetDataSource(this);
-        _list.ReloadData();
-    }
-
-    public int Count => 1000;
-
-    public void BindItem(UIVirtualListItem item, int index)
-    {
-        // bind item
-    }
-}
-```
-
-当前限制：
-- P6 仅支持固定 Item 尺寸。
-- 垂直列表优先（水平为基础预留）。
-- Grid / 不等高 / 循环列表为后续扩展。
+供应商源码仅在用户合法持有的本地副本中安装，不随框架公开分发。安装命令、程序集
+边界、迁移限制和原创 `SuperScrollViewSamplePage` 示例见
+[Virtualization.md](Documentation/Y2.0/Virtualization.md)。动态 Grid、无限循环和
+staggered 布局未由当前适配器提供；不根据供应商 Demo 名称推断支持。
 
 ## P7 UI 转场动画 / 页面过渡系统
 

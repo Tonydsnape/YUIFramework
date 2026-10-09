@@ -1,0 +1,7 @@
+{
+  "name": "YUIFramework.SuperScrollView.Tests",
+  "references": ["YUIFramework.Runtime", "YUIFramework.SuperScrollView", "SuperScrollView", "UniTask", "Unity.ugui"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"]
+}

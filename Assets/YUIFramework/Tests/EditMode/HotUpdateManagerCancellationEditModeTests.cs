@@ -116,12 +116,14 @@ namespace YUIFramework.Tests
             ControllableHandle handle,
             CancellationToken cancellationToken)
         {
+#pragma warning disable CS0618 // This regression deliberately exercises the legacy facade.
             return HotUpdateManager.WaitForHandleAsync(
                 () => handle.IsDone,
                 () => handle.IsValid,
                 () => handle.Succeeded,
                 handle.Release,
                 cancellationToken);
+#pragma warning restore CS0618
         }
 
         private static async UniTask WaitForCompletionAsync(System.Threading.Tasks.Task task)

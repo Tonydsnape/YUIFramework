@@ -1,0 +1,5 @@
+{
+  "name": "YUIFramework.SuperScrollView",
+  "references": ["YUIFramework.Runtime", "SuperScrollView", "UniTask", "Unity.ugui"],
+  "autoReferenced": true
+}

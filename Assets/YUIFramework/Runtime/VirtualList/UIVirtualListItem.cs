@@ -27,8 +27,9 @@ namespace YUIFramework
             EnsureRectTransform();
         }
 
-        internal void BindIndex(int index)
+        public void BindIndex(int index)
         {
+            UnbindIndex();
             Index = index;
             OnBindIndex(index);
         }
@@ -50,6 +51,11 @@ namespace YUIFramework
 
         protected virtual void OnUnbindIndex()
         {
+        }
+
+        protected virtual void OnDisable()
+        {
+            UnbindIndex();
         }
 
         private void EnsureRectTransform()

@@ -195,3 +195,12 @@ channel engine.
 assembly or reflection dependency. `UIDataBinding` covers common uGUI and TextMeshPro
 controls. `BaseContext.SetViewModel` distinguishes `Owned` from `External`; binding scope is
 tracked independently from ViewModel ownership. See [MVVM.md](MVVM.md).
+
+## Commercial virtual lists
+
+Stage 10 separates stable-ID `UIListDataSource<T>`, `UIListSelection`, and generation-fenced
+`UIListItemBinding` from the optional `SuperScrollViewList<T>` native List/Grid backend.
+Collection mutations drive incremental view updates; item reuse always ends the prior bind.
+The licensed plugin is installed locally into an excluded directory, never referenced by
+the core Runtime assembly. Ownership, installation, supported layouts, and the obsolete
+`UIVirtualList` forwarding contract are defined in [Virtualization.md](Virtualization.md).

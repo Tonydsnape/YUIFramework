@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
+#pragma warning disable CS0618 // Legacy sample deliberately exercises the migration facade.
 
 namespace YUIFramework
 {
@@ -85,8 +86,8 @@ namespace YUIFramework
             _virtualList.Layout.Direction = UIVirtualListDirection.Vertical;
             _virtualList.Layout.ItemSize = 76f;
             _virtualList.Layout.Spacing = 8f;
-            _virtualList.Layout.PaddingStart = 12f;
-            _virtualList.Layout.PaddingEnd = 12f;
+            _virtualList.Layout.PaddingStart = 0f;
+            _virtualList.Layout.PaddingEnd = 0f;
             _virtualList.Layout.ExtraVisibleCount = 3;
             _virtualList.SetDataSource(this);
             _virtualList.ReloadData();
