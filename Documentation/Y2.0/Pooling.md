@@ -98,8 +98,9 @@ Framework-owned transient work can be registered through:
 - `TrackDisplayBinding` / `TrackDisplayResource`
 - `AcquireDisplayInputLock`
 
-Permanent subscriptions and bindings created with the existing lifetime helpers remain
-alive while pooled and are released only by `OnDestroy`. Stage 7 does not redesign MVVM.
+Permanent subscriptions and bindings created with the lifetime helpers remain alive while
+pooled and are released only by `OnDestroy`. Stage 9 typed message and MVVM helpers use these
+same lifetime/display collections rather than adding a competing scope.
 Cancellation of a hide transition occurs before display cleanup, so close cancellation
 returns to the stable visible state with its display scope intact.
 
@@ -135,3 +136,7 @@ Stage 8 integrates with this ownership model without changing it: a completed hi
 the captured visual baseline immediately after deactivation and before an entry becomes
 idle. A pooled rebind can refresh that baseline at a stable inactive point. Transition
 generation is forgotten on terminal release, and prewarm never starts a visual transition.
+
+Stage 9 keeps owned or external ViewModels and lifetime bindings attached while an instance
+is idle. Every display subscription/binding is removed before return. Terminal eviction
+disposes owned ViewModels only; borrowed ViewModels remain caller-owned.

@@ -138,3 +138,15 @@ restores `Opened`, the captured visual baseline, interaction state, and
 Visibility is deliberately orthogonal to `UIContextState`: `Visible`, `Interactable`,
 `Covered`, and `Suspended` can change because of navigation, modal composition, or input
 locks without inventing lifecycle graph states. See [Transitions.md](Transitions.md).
+
+## Stage 9 messaging and ViewModel ownership
+
+Lifetime message subscriptions and bindings survive hide/pool and end during terminal
+`OnDestroy`. Display subscriptions and bindings end with the stage 7 display scope; a stage
+8 reverse/cancel that restores `Opened` deliberately keeps them. Rebinding a ViewModel
+detaches old lifetime and display bindings before publishing the replacement.
+
+Owned ViewModels are disposed on replacement or terminal release. External ViewModels are
+borrowed and never disposed by UI lifecycle cleanup. Message, binding, command, and
+ViewModel cleanup attempts every item and aggregates errors without skipping later owners.
+See [Messaging.md](Messaging.md) and [MVVM.md](MVVM.md).

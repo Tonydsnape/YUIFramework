@@ -16,11 +16,13 @@ namespace YUIFramework
         private readonly List<UIMessageToken> _messageTokens = new List<UIMessageToken>();
         private readonly List<IDisposable> _bindingTokens = new List<IDisposable>();
         private readonly List<UIMessageToken> _displayMessageTokens = new List<UIMessageToken>();
+        private readonly List<IDisposable> _displayBindings = new List<IDisposable>();
         private readonly List<IDisposable> _displayResources = new List<IDisposable>();
         private readonly UIContextStateMachine _stateMachine = new UIContextStateMachine();
         private readonly CancellationTokenSource _lifetimeCancellation = new CancellationTokenSource();
         private readonly CancellationToken _lifetimeToken;
         private IViewModel _viewModel;
+        private UIViewModelOwnership _viewModelOwnership;
         private IUIMessageBus _messageBus;
         private UIContextOperation _currentOperation;
         private bool _lifetimeCancellationDisposed;
@@ -237,6 +239,7 @@ namespace YUIFramework
             }
 
             DisposeTracked(_displayMessageTokens, errors);
+            DisposeTracked(_displayBindings, errors);
             DisposeTracked(_displayResources, errors);
             return errors.Count == 0
                 ? null
@@ -322,7 +325,14 @@ namespace YUIFramework
                 errors.Add(exception);
             }
 
-            ClearBindings();
+            try
+            {
+                ClearBindings();
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
             try
             {
                 ClearViewModel();
@@ -389,28 +399,51 @@ namespace YUIFramework
         {
         }
 
+        protected UIMessageToken SubscribeMessage<T>(
+            UIMessageTopic<T> topic,
+            Action<T> handler,
+            int priority = 0)
+        {
+            var token = GetMessageBus().Subscribe(
+                topic,
+                handler,
+                priority: priority,
+                owner: this);
+            TrackMessageToken(token);
+            return token;
+        }
+
+        protected void PublishMessage<T>(UIMessageTopic<T> topic, T payload)
+        {
+            GetMessageBus().Publish(topic, payload);
+        }
+
+        [Obsolete("Use SubscribeMessage(UIMessageTopic<UIMessageUnit>, ...). String message APIs will be removed after the Y2 migration window.")]
         protected UIMessageToken SubscribeMessage(string messageName, Action handler)
         {
-            var token = GetMessageBus().Subscribe(messageName, handler, this);
-            TrackMessageToken(token);
-            return token;
+            return SubscribeMessage(
+                new UIMessageTopic<UIMessageUnit>(messageName),
+                _ => handler());
         }
 
+        [Obsolete("Use SubscribeMessage(UIMessageTopic<T>, ...). String message APIs will be removed after the Y2 migration window.")]
         protected UIMessageToken SubscribeMessage<T>(string messageName, Action<T> handler)
         {
-            var token = GetMessageBus().Subscribe(messageName, handler, this);
-            TrackMessageToken(token);
-            return token;
+            return SubscribeMessage(new UIMessageTopic<T>(messageName), handler);
         }
 
+        [Obsolete("Use PublishMessage(UIMessageTopic<UIMessageUnit>, UIMessageUnit.Value). String message APIs will be removed after the Y2 migration window.")]
         protected void PublishMessage(string messageName)
         {
-            GetMessageBus().Publish(messageName);
+            PublishMessage(
+                new UIMessageTopic<UIMessageUnit>(messageName),
+                UIMessageUnit.Value);
         }
 
+        [Obsolete("Use PublishMessage(UIMessageTopic<T>, payload). String message APIs will be removed after the Y2 migration window.")]
         protected void PublishMessage<T>(string messageName, T payload)
         {
-            GetMessageBus().Publish(messageName, payload);
+            PublishMessage(new UIMessageTopic<T>(messageName), payload);
         }
 
         protected void TrackMessageToken(UIMessageToken token)
@@ -423,18 +456,32 @@ namespace YUIFramework
             _messageTokens.Add(token);
         }
 
-        protected UIMessageToken SubscribeDisplayMessage(string messageName, Action handler)
+        protected UIMessageToken SubscribeDisplayMessage<T>(
+            UIMessageTopic<T> topic,
+            Action<T> handler,
+            int priority = 0)
         {
-            var token = GetMessageBus().Subscribe(messageName, handler, this);
+            var token = GetMessageBus().Subscribe(
+                topic,
+                handler,
+                priority: priority,
+                owner: this);
             TrackDisplayMessageToken(token);
             return token;
         }
 
+        [Obsolete("Use SubscribeDisplayMessage(UIMessageTopic<UIMessageUnit>, ...). String message APIs will be removed after the Y2 migration window.")]
+        protected UIMessageToken SubscribeDisplayMessage(string messageName, Action handler)
+        {
+            return SubscribeDisplayMessage(
+                new UIMessageTopic<UIMessageUnit>(messageName),
+                _ => handler());
+        }
+
+        [Obsolete("Use SubscribeDisplayMessage(UIMessageTopic<T>, ...). String message APIs will be removed after the Y2 migration window.")]
         protected UIMessageToken SubscribeDisplayMessage<T>(string messageName, Action<T> handler)
         {
-            var token = GetMessageBus().Subscribe(messageName, handler, this);
-            TrackDisplayMessageToken(token);
-            return token;
+            return SubscribeDisplayMessage(new UIMessageTopic<T>(messageName), handler);
         }
 
         protected void TrackDisplayMessageToken(UIMessageToken token)
@@ -481,17 +528,40 @@ namespace YUIFramework
         }
 
         /// <summary>
-        /// 设置当前 Context 的 ViewModel。替换时会释放旧实例。
+        /// Replaces the current ViewModel after detaching lifetime bindings.
+        /// Owned ViewModels are disposed on replacement/destruction; external ones are not.
         /// </summary>
-        protected void SetViewModel(IViewModel viewModel)
+        protected void SetViewModel(
+            IViewModel viewModel,
+            UIViewModelOwnership ownership = UIViewModelOwnership.Owned)
         {
             if (ReferenceEquals(_viewModel, viewModel))
             {
+                _viewModelOwnership = ownership;
                 return;
+            }
+
+            var errors = new List<Exception>();
+            try
+            {
+                ClearBindings();
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
+
+            DisposeTracked(_displayBindings, errors);
+            if (errors.Count > 0)
+            {
+                throw new AggregateException(
+                    $"ViewModel binding cleanup failed for {GetType().Name}.",
+                    errors);
             }
 
             ClearViewModel();
             _viewModel = viewModel;
+            _viewModelOwnership = ownership;
         }
 
         protected T GetViewModel<T>() where T : class, IViewModel
@@ -519,7 +589,10 @@ namespace YUIFramework
 
         protected void TrackDisplayBinding(IDisposable bindingToken)
         {
-            TrackDisplayResource(bindingToken);
+            if (bindingToken != null)
+            {
+                _displayBindings.Add(bindingToken);
+            }
         }
 
         protected void TrackDisplayResource(IDisposable resource)
@@ -561,6 +634,7 @@ namespace YUIFramework
 
         protected void ClearBindings()
         {
+            List<Exception> errors = null;
             for (var i = _bindingTokens.Count - 1; i >= 0; i--)
             {
                 try
@@ -569,11 +643,18 @@ namespace YUIFramework
                 }
                 catch (Exception exception)
                 {
-                    Debug.LogException(exception);
+                    errors ??= new List<Exception>();
+                    errors.Add(exception);
                 }
             }
 
             _bindingTokens.Clear();
+            if (errors != null)
+            {
+                throw new AggregateException(
+                    $"Binding cleanup failed for {GetType().Name}.",
+                    errors);
+            }
         }
 
         protected void ClearViewModel(bool dispose = true)
@@ -585,8 +666,10 @@ namespace YUIFramework
 
             var vm = _viewModel;
             _viewModel = null;
+            var ownership = _viewModelOwnership;
+            _viewModelOwnership = UIViewModelOwnership.External;
 
-            if (dispose)
+            if (dispose && ownership == UIViewModelOwnership.Owned)
             {
                 vm.Dispose();
             }

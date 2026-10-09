@@ -16,8 +16,6 @@ namespace YUIFramework
         private Button _backButton;
         private Toggle _enabledToggle;
         private Slider _progressSlider;
-        private UnityAction _incrementAction;
-        private UnityAction _backAction;
 
         protected override void HandleInit()
         {
@@ -50,25 +48,14 @@ namespace YUIFramework
             TrackBinding(UIDataBinding.BindText(_progressText, vm.Progress, value => $"Progress: {value:0.00}"));
             TrackBinding(UIDataBinding.BindToggle(_enabledToggle, vm.Enabled, BindingMode.TwoWay));
             TrackBinding(UIDataBinding.BindSlider(_progressSlider, vm.Progress, BindingMode.TwoWay));
-            TrackBinding(vm.Enabled.Subscribe(value => _incrementButton.interactable = value));
-
-            _incrementAction = vm.Increment;
-            _backAction = async () => await UIManager.Instance.Navigator.BackAsync();
-            _incrementButton.onClick.AddListener(_incrementAction);
-            _backButton.onClick.AddListener(_backAction);
-        }
-
-        protected override void HandleDestroy()
-        {
-            if (_incrementButton != null && _incrementAction != null)
-            {
-                _incrementButton.onClick.RemoveListener(_incrementAction);
-            }
-
-            if (_backButton != null && _backAction != null)
-            {
-                _backButton.onClick.RemoveListener(_backAction);
-            }
+            TrackBinding(UIDataBinding.BindButton(_incrementButton, vm.IncrementCommand));
+            var backCommand = new UIAsyncCommand(
+                async cancellationToken =>
+                {
+                    await Services.Navigator.BackAsync(cancellationToken);
+                });
+            TrackBinding(backCommand);
+            TrackBinding(UIDataBinding.BindButton(_backButton, backCommand));
         }
 
         private static Text CreateLabel(string name, RectTransform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 size, Vector2 anchoredPosition, int fontSize)

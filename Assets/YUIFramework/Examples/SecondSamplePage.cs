@@ -15,7 +15,7 @@ namespace YUIFramework
 
         protected override void HandleInit()
         {
-            SubscribeMessage<string>("sample.hello", OnSampleHelloMessage);
+            SubscribeMessage(SampleMessages.Hello, OnSampleHelloMessage);
 
             var root = View.RectTransform;
             root.anchorMin = Vector2.zero;

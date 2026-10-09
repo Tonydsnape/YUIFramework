@@ -6,7 +6,7 @@ namespace YUIFramework
     /// <summary>
     /// 轻量可观察属性，提供值变化通知。
     /// </summary>
-    public sealed class ObservableProperty<T>
+    public sealed class ObservableProperty<T> : IObservableProperty<T>
     {
         private static readonly EqualityComparer<T> Comparer = EqualityComparer<T>.Default;
         private T _value;
@@ -52,9 +52,17 @@ namespace YUIFramework
             }
 
             ValueChanged += ValueChangedHandler;
-            if (notifyImmediately)
+            try
             {
-                handler(_value);
+                if (notifyImmediately)
+                {
+                    handler(_value);
+                }
+            }
+            catch
+            {
+                ValueChanged -= ValueChangedHandler;
+                throw;
             }
 
             return new BindingToken(() => ValueChanged -= ValueChangedHandler);
@@ -68,9 +76,17 @@ namespace YUIFramework
             }
 
             ValueChanged += handler;
-            if (notifyImmediately)
+            try
             {
-                handler(_value, _value);
+                if (notifyImmediately)
+                {
+                    handler(_value, _value);
+                }
+            }
+            catch
+            {
+                ValueChanged -= handler;
+                throw;
             }
 
             return new BindingToken(() => ValueChanged -= handler);
@@ -79,6 +95,11 @@ namespace YUIFramework
         public void SetValueWithoutNotify(T value)
         {
             _value = value;
+        }
+
+        public ReadOnlyObservableProperty<T> AsReadOnly()
+        {
+            return new ReadOnlyObservableProperty<T>(this);
         }
     }
 }

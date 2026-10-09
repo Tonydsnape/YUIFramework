@@ -90,10 +90,11 @@ namespace YUIFramework.Tests
         public void MessageCenter_TypedSubscription_ReceivesPayload()
         {
             var messages = new UIMessageCenter();
+            var topic = new UIMessageTopic<int>("score.changed");
             var received = 0;
-            using var token = messages.Subscribe<int>("score.changed", value => received = value);
+            using var token = messages.Subscribe(topic, value => received = value);
 
-            messages.Publish("score.changed", 42);
+            messages.Publish(topic, 42);
 
             Assert.That(received, Is.EqualTo(42));
             Assert.That(messages.ListenerCount, Is.EqualTo(1));
@@ -103,12 +104,13 @@ namespace YUIFramework.Tests
         public void MessageCenter_DisposedSubscription_StopsReceiving()
         {
             var messages = new UIMessageCenter();
+            var topic = new UIMessageTopic<UIMessageUnit>("refresh");
             var received = 0;
-            var token = messages.Subscribe("refresh", () => received++);
+            var token = messages.Subscribe(topic, _ => received++);
 
-            messages.Publish("refresh");
+            messages.Publish(topic, UIMessageUnit.Value);
             token.Dispose();
-            messages.Publish("refresh");
+            messages.Publish(topic, UIMessageUnit.Value);
 
             Assert.That(received, Is.EqualTo(1));
             Assert.That(messages.ListenerCount, Is.Zero);
@@ -118,14 +120,15 @@ namespace YUIFramework.Tests
         public void MessageCenter_UnsubscribeOwner_RemovesOnlyOwnedSubscriptions()
         {
             var messages = new UIMessageCenter();
+            var topic = new UIMessageTopic<UIMessageUnit>("refresh");
             var firstOwner = new object();
             var secondOwner = new object();
-            messages.Subscribe("refresh", () => { }, firstOwner);
-            messages.Subscribe("refresh", () => { }, secondOwner);
+            messages.Subscribe(topic, _ => { }, owner: firstOwner);
+            messages.Subscribe(topic, _ => { }, owner: secondOwner);
 
             messages.UnsubscribeOwner(firstOwner);
 
-            Assert.That(messages.Count("refresh"), Is.EqualTo(1));
+            Assert.That(messages.Count(topic), Is.EqualTo(1));
         }
 
         [Test]

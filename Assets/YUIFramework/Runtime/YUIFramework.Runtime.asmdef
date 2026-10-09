@@ -2,7 +2,8 @@
   "name": "YUIFramework.Runtime",
   "rootNamespace": "YUIFramework",
   "references": [
-    "UniTask"
+    "UniTask",
+    "Unity.TextMeshPro"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

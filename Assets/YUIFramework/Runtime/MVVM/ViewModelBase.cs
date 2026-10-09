@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace YUIFramework
 {
@@ -41,7 +40,15 @@ namespace YUIFramework
             }
 
             IsDisposed = true;
-            OnDispose();
+            List<Exception> errors = null;
+            try
+            {
+                OnDispose();
+            }
+            catch (Exception exception)
+            {
+                errors = new List<Exception> { exception };
+            }
 
             for (var i = _disposables.Count - 1; i >= 0; i--)
             {
@@ -51,11 +58,18 @@ namespace YUIFramework
                 }
                 catch (Exception exception)
                 {
-                    Debug.LogException(exception);
+                    errors ??= new List<Exception>();
+                    errors.Add(exception);
                 }
             }
 
             _disposables.Clear();
+            if (errors != null)
+            {
+                throw new AggregateException(
+                    $"{GetType().Name} cleanup failed.",
+                    errors);
+            }
         }
     }
 }

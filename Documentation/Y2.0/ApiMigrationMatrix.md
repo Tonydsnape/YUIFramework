@@ -21,7 +21,11 @@ This matrix records intent before implementation. Final Y2 names may be refined 
 | `RemoteServices` static URL composition | `YooAssetBootstrapBackend` endpoint-scoped resolver | Obsolete facade only; Y2 path is application/channel/version/platform/package scoped |
 | `StartupFlowTrace` static sequence | Injected structured telemetry | Obsolete log facade has no retained sequence/state |
 | resource "hot update" terminology | resource bootstrap/resource update | Code loading is the independent `IBootstrapCodeLoader` extension point |
-| String message names | Strongly typed topics/messages | String API temporarily obsolete |
+| String message names | `UIMessageTopic<T>` + `IUIMessageBus` | `[Obsolete]` string overloads forward to the same typed channel engine |
+| Owner-only message cleanup | `UIMessageScope` or context lifetime/display helpers | Owner removal retained for the compatibility window |
+| Ad-hoc button callbacks | `UICommand` / `UIAsyncCommand` + `UIDataBinding.BindButton` | Awaitable failures/cancellation and CanExecute are now explicit |
+| Mutable-only observable property | `IReadOnlyObservableProperty<T>` / `IObservableProperty<T>` / `ValidatedProperty<T>` | `ObservableProperty<T>` implements the new interfaces |
+| Context-owned ViewModel by assumption | `SetViewModel(vm, UIViewModelOwnership)` | Default remains `Owned`; borrowed instances opt into `External` |
 | `Task` runtime APIs | `UniTask` + `CancellationToken` | Runtime migration implemented |
 | Mutable `UIConfig` fields | Validated descriptor/config asset | Import/conversion helper |
 | `DefaultLayer` plus config layer | Single authoritative layer source | Resolve during contract phase |

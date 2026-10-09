@@ -89,9 +89,10 @@ namespace YUIFramework
             _nextAction = async () =>
             {
                 await UIManager.Instance.Navigator.PushAsync<SecondSamplePage>("Welcome to SecondSamplePage");
-                PublishMessage("sample.hello", "Hello from SampleHelloPage");
+                PublishMessage(SampleMessages.Hello, "Hello from SampleHelloPage");
             };
-            _publishAction = () => PublishMessage("sample.hello", "Hello from SampleHelloPage");
+            _publishAction = () =>
+                PublishMessage(SampleMessages.Hello, "Hello from SampleHelloPage");
             _closeButton.onClick.AddListener(_closeAction);
             _nextButton.onClick.AddListener(_nextAction);
 

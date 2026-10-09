@@ -18,6 +18,10 @@
   custom-transition failure recovery, navigation coverage/suspension, stale-continuation
   fencing after forget/disposal, curve snapshots, pool-rebind baselines, and 1,000-cycle
   baseline stability (`Phase8TransitionsPlayModeTests`).
+  Stage 9 adds typed-message ordering/mutation/error/scope/GC tests, command and validation
+  contracts, real uGUI/TMP binding tests, and 1,000-cycle display/lifetime/VM ownership
+  coverage (`Stage9MessagingMvvmEditModeTests`,
+  `Stage9BindingsLifecyclePlayModeTests`).
 
 The PlayMode assembly references `YUIFramework.Runtime` and UniTask. EditMode additionally
 references `YUIFramework.Bootstrap` and `YUIFramework.Bootstrap.YooAsset`. Stage 5 drives a
@@ -112,6 +116,31 @@ callback isolation, samples reverse continuity and `AnimationCurve` progress mid
 and validates explicit baseline refresh plus pooled rebind without drift. Both full logs
 contain zero `error CS`, compilation-failure, `Unobserved`, or `NullReferenceException`
 matches.
+
+## Stage 9 acceptance
+
+Unity `2022.3.62f2` final post-review gate on 2026-10-08:
+
+| Suite | Result | UTC interval | Persistent XML |
+|---|---:|---|---|
+| Directed EditMode | 14 passed, 0 failed, 0 skipped/inconclusive | 08:49:18 | `C:\Users\21093\.copilot\session-state\7310900a-0fd1-4a43-bd14-c674e24903bf\files\phase9-acceptance-final-directed-editmode.xml` |
+| Directed PlayMode | 8 passed, 0 failed, 0 skipped/inconclusive | 08:49:55-08:49:56 | `C:\Users\21093\.copilot\session-state\7310900a-0fd1-4a43-bd14-c674e24903bf\files\phase9-acceptance-final-directed-playmode.xml` |
+| Full EditMode | 160 passed, 0 failed, 0 skipped/inconclusive | 08:50:51-08:50:54 | `C:\Users\21093\.copilot\session-state\7310900a-0fd1-4a43-bd14-c674e24903bf\files\phase9-acceptance-final-editmode.xml` |
+| Full PlayMode | 133 passed, 0 failed, 0 skipped/inconclusive | 08:51:17-08:51:31 | `C:\Users\21093\.copilot\session-state\7310900a-0fd1-4a43-bd14-c674e24903bf\files\phase9-acceptance-final-playmode.xml` |
+
+An interactive editor owned the checkout during the final gate, so the runs used the
+session-local `phase9-validation-project`. Before the final suites, SHA-256 manifests for
+all 386 files under `Assets`, `Packages`, and `ProjectSettings` matched the checkout exactly
+(zero missing, mismatched, or extra source files). No repository file was written by the
+validation editor.
+
+The full logs contain zero `warning CS`, `error CS`, compilation-failure, `Unobserved`, or
+`NullReferenceException` matches. `GC.GetAllocatedBytesForCurrentThread` reports **0 bytes
+over 10,000 warmed typed publishes** and **0 bytes over 10,000 paired
+`ObservableProperty<float/bool>` to real inactive `Slider`/`Toggle` updates** in Editor/Mono.
+The binding regression enforces a 4,096-byte total budget to tolerate bounded Unity/Editor
+bookkeeping while rejecting per-update allocation. These measurements exclude subscription
+mutation, formatting strings, other Unity controls, device profiling, and frame-rate claims.
 
 ## Characterization-test rule
 

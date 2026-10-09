@@ -16,6 +16,10 @@ namespace YUIFramework.Tests
     public sealed class PoolingGovernancePlayModeTests
     {
         private const string PackageName = "PoolPackage";
+        private static readonly UIMessageTopic<UIMessageUnit> PermanentTopic =
+            new UIMessageTopic<UIMessageUnit>("pool.permanent");
+        private static readonly UIMessageTopic<UIMessageUnit> DisplayTopic =
+            new UIMessageTopic<UIMessageUnit>("pool.display");
 
         private FakeResourceProvider _provider;
         private UIResourceService _resources;
@@ -352,7 +356,7 @@ namespace YUIFramework.Tests
                 InitCount++;
                 InitCountForInstance++;
                 Created.Add(ViewObject);
-                SubscribeMessage("pool.permanent", () => { });
+                SubscribeMessage(PermanentTopic, _ => { });
             }
 
             protected override void HandleResetForReuse(object previousArgs, object nextArgs)
@@ -364,7 +368,7 @@ namespace YUIFramework.Tests
             {
                 ShowCount++;
                 CapturedDisplayToken = DisplayToken;
-                SubscribeDisplayMessage("pool.display", () => { });
+                SubscribeDisplayMessage(DisplayTopic, _ => { });
                 AcquireDisplayInputLock("pool display");
                 TrackDisplayResource(new CallbackDisposable(
                     () => DisplayResourceDisposeCount++));

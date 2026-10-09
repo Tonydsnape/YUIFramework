@@ -9,6 +9,17 @@ namespace YUIFramework
         public ObservableProperty<int> ClickCount { get; } = new ObservableProperty<int>(0);
         public ObservableProperty<bool> Enabled { get; } = new ObservableProperty<bool>(true);
         public ObservableProperty<float> Progress { get; } = new ObservableProperty<float>(0.5f);
+        public UICommand IncrementCommand { get; }
+
+        public MvvmSampleViewModel()
+        {
+            IncrementCommand = new UICommand(Increment, () => Enabled.Value);
+            TrackDisposable(IncrementCommand);
+            TrackDisposable(
+                Enabled.Subscribe(
+                    _ => IncrementCommand.NotifyCanExecuteChanged(),
+                    false));
+        }
 
         public void Increment()
         {

@@ -14,6 +14,9 @@ namespace YUIFramework.Tests
 {
     public sealed class UIManagerCharacterizationTests
     {
+        private static readonly UIMessageTopic<int> TestValueTopic =
+            new UIMessageTopic<int>("tests.value");
+
         private CharacterizationResourceLoader _loader;
         private UIManager _manager;
         private GameObject _rootObject;
@@ -297,7 +300,7 @@ namespace YUIFramework.Tests
 
             var openTask = _manager.OpenAsync<MessagingPage>().AsTask();
             yield return Await(openTask);
-            _manager.MessageCenter.Publish("tests.value", 42);
+            _manager.MessageCenter.Publish(TestValueTopic, 42);
 
             Assert.That(openTask.Result.ReceivedValue, Is.EqualTo(42));
             Assert.That(_manager.MessageCenter.ListenerCount, Is.EqualTo(1));
@@ -740,7 +743,7 @@ namespace YUIFramework.Tests
             protected override void HandleInit()
             {
                 base.HandleInit();
-                SubscribeMessage<int>("tests.value", value => ReceivedValue = value);
+                SubscribeMessage(TestValueTopic, value => ReceivedValue = value);
             }
         }
 

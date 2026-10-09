@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace YUIFramework
 {
@@ -56,6 +55,7 @@ namespace YUIFramework
             }
 
             IsDisposed = true;
+            List<Exception> errors = null;
             for (var i = _disposeActions.Count - 1; i >= 0; i--)
             {
                 try
@@ -64,11 +64,16 @@ namespace YUIFramework
                 }
                 catch (Exception exception)
                 {
-                    Debug.LogException(exception);
+                    errors ??= new List<Exception>();
+                    errors.Add(exception);
                 }
             }
 
             _disposeActions.Clear();
+            if (errors != null)
+            {
+                throw new AggregateException("Binding cleanup failed.", errors);
+            }
         }
     }
 }

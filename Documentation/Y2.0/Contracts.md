@@ -75,6 +75,11 @@ For YooAsset loads, cancellation stops the caller's wait immediately. If YooAsse
 
 Derived contexts can access the owning service through the protected `Services` property. This is the supported route for navigation and service interaction in injected Y2 applications.
 
+Stage 9 adds typed `UIMessageTopic<T>` helpers for lifetime and display subscriptions. Topic
+payload mismatch is an immediate error, subscriber failures aggregate after stable ordered
+dispatch, and `UIMessageScope` binds explicit subscriptions to cancellation/disposal. See
+[Messaging.md](Messaging.md).
+
 ## Navigation
 
 `IUINavigator` exposes the current navigation API using UniTask and cancellation.
@@ -178,3 +183,15 @@ lifecycle rollback/commit on the existing lane.
 `Suspended` flags. `UIInteractionController` remains the sole raycast authority.
 `WaitUntilResumedAsync` gates framework-managed display work and is linked to display and
 lifetime cancellation. See [Transitions.md](Transitions.md).
+
+## Messaging and MVVM lifecycle
+
+`IUIMessageBus` exposes typed topics, priorities, stable subscription order, explicit scopes,
+and main-thread-confined mutation. Obsolete string overloads forward to the same typed
+channel engine.
+
+`IReadOnlyObservableProperty<T>`, `IObservableProperty<T>`, validated properties,
+`IUICommand`, `UICommand`, and `UIAsyncCommand` are public runtime contracts with no business
+assembly or reflection dependency. `UIDataBinding` covers common uGUI and TextMeshPro
+controls. `BaseContext.SetViewModel` distinguishes `Owned` from `External`; binding scope is
+tracked independently from ViewModel ownership. See [MVVM.md](MVVM.md).

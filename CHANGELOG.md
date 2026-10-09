@@ -77,6 +77,10 @@ All notable changes to YUIFramework are documented in this file.
 - Built-in transition teardown now retires registry identity before cancellation, preventing
   delayed continuations from writing rebound views; disposal continues canceling remaining
   sessions when an individual callback fails and reports the failures together.
+- Stage 9 typed message topics with stable priority ordering, scoped subscriptions,
+  dispatch-error aggregation, and allocation-free steady-state typed publish.
+- Awaitable sync/async commands, validation/read-only observable contracts, owned/external
+  ViewModel policy, and code-first uGUI/TextMeshPro bindings for common controls.
 
 ### Changed
 
@@ -163,6 +167,9 @@ All notable changes to YUIFramework are documented in this file.
 - Show and navigation-hide animations now run inside their existing per-type FIFO lifecycle
   operations. Built-in visual writes are single-owner and generation-fenced; pooled reuse
   restores captured non-default alpha, scale, and position without drift.
+- String message APIs are obsolete facades over the typed engine. Context lifetime/display
+  helpers, commands, bindings, and ViewModels now share deterministic cleanup and aggregate
+  failures after attempting every item.
 
 ### Migration
 
@@ -170,5 +177,5 @@ All notable changes to YUIFramework are documented in this file.
 - YooAsset 3.x is the only production resource backend as of stage 5; Addressables support
   has been removed, and Resources is limited to tests and minimal Editor compatibility.
 - Runtime asynchronous APIs use UniTask with `CancellationToken`.
-- Stage 8 interruptible transitions and visibility is complete. Stage 9 messaging and
-  MVVM lifecycle work has not started.
+- Stage 9 messaging and MVVM lifecycle is complete. Stage 10 virtual-list work has not
+  started.
