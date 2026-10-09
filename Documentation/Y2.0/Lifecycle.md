@@ -4,6 +4,12 @@ Stage 2 gives every `BaseContext` one explicit state machine and at most one act
 
 ## State graph
 
+The independent [Config startup](Config.md) precedes UI registration and does not add
+Context states. New UI batch configuration cannot replace active/pooled registrations.
+Config reload publishes data snapshots only; owners must explicitly shut down/reinitialize
+UI before applying a new registry. Teardown remains UI -> Config -> resource service ->
+Bootstrap; Config does not own injected resources.
+
 ```mermaid
 stateDiagram-v2
     [*] --> Unloaded

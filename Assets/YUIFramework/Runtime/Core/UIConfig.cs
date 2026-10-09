@@ -16,6 +16,9 @@ namespace YUIFramework
         /// <summary>资源地址，传入 IResourceLoader。</summary>
         public string PrefabKey;
 
+        /// <summary>Null uses the resource service's default package.</summary>
+        public string PrefabPackage;
+
         /// <summary>目标层级。</summary>
         public UILayer Layer;
 
@@ -116,6 +119,15 @@ namespace YUIFramework
             };
             options.Normalize();
             return options;
+        }
+
+        public UIConfig Copy()
+        {
+            var copy = (UIConfig)MemberwiseClone();
+            if (TransitionCurve != null)
+                copy.TransitionCurve = new UnityEngine.AnimationCurve(TransitionCurve.keys)
+                { preWrapMode = TransitionCurve.preWrapMode, postWrapMode = TransitionCurve.postWrapMode };
+            return copy;
         }
     }
 }

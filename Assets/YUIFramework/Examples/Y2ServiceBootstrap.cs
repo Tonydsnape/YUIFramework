@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using YUIFramework.Configuration;
 
 namespace YUIFramework.Examples
 {
@@ -10,7 +11,7 @@ namespace YUIFramework.Examples
     /// </summary>
     public sealed class Y2ServiceBootstrap : MonoBehaviour
     {
-        private IUIService _uiService;
+        private UIManager _uiService;
 
         private void Start()
         {
@@ -20,35 +21,19 @@ namespace YUIFramework.Examples
         private async UniTask RunAsync(CancellationToken cancellationToken)
         {
             _uiService = new UIManager();
+            var configOwner = new SampleConfigOwner();
             try
             {
                 await _uiService.InitializeAsync(
                     new CodeViewLoader(),
                     cancellationToken: cancellationToken);
-                _uiService.Register<SampleHelloPage>(new UIConfig
-                {
-                    Id = nameof(SampleHelloPage),
-                    PrefabKey = "SampleHelloPage",
-                    Layer = UILayer.Normal,
-                    CacheOnClose = true,
-                    MaxPoolSize = 2,
-                    PreloadCount = 2,
-                    PoolPriority = 10,
-                    PoolIdleTimeoutSeconds = 120,
-                    FullScreen = true,
-                    UseTransition = true,
-                    TransitionType = UITransitionType.Fade,
-                    ShowDuration = 0.2f,
-                    HideDuration = 0.15f,
-                    IgnoreTransitionTimeScale = true,
-                    SuspendWhenCovered = true
-                });
-
-                await _uiService.PrewarmRegisteredAsync(
-                    cancellationToken: cancellationToken);
-                await _uiService.Navigator.PushAsync<SampleHelloPage>(
-                    "Hello YUIFramework Y2!",
-                    cancellationToken: cancellationToken);
+                await ConfigUIStartup.EnterAsync(configOwner.Service, _uiService,
+                    snapshot => SampleUIConfiguration.Map(snapshot, "y2"), async token =>
+                    {
+                        await _uiService.PrewarmRegisteredAsync(cancellationToken: token);
+                        await _uiService.Navigator.PushAsync<SampleHelloPage>(
+                            "Hello YUIFramework Y2!", cancellationToken: token);
+                    }, cancellationToken);
                 await UniTask.WaitUntilCanceled(cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -56,10 +41,8 @@ namespace YUIFramework.Examples
             }
             finally
             {
-                if (_uiService.IsInitialized)
-                {
-                    await _uiService.ShutdownAsync();
-                }
+                try { if (_uiService.IsInitialized) await _uiService.ShutdownAsync(); }
+                finally { await configOwner.ShutdownAsync(); }
             }
         }
     }

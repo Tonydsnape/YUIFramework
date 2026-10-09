@@ -1,0 +1,21 @@
+{
+  "name": "yuiframework-config",
+  "version": "1.0.0",
+  "private": true,
+  "description": "YUIFramework Excel configuration pipeline",
+  "scripts": {
+    "sample": "node tools/create-ui-workbook.js",
+    "export:client": "node src/cli.js --target client",
+    "export:server": "node src/cli.js --target server",
+    "validate": "node src/cli.js --validate",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@msgpack/msgpack": "3.1.2",
+    "exceljs": "4.4.0",
+    "json5": "2.2.3"
+  }
+}

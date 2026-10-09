@@ -1,5 +1,53 @@
 # Y2.0 Testing Baseline
 
+## Independent Config integration acceptance
+
+Unity 2022.3.62f2, 2026-10-09. Exact intervals below are from the XML `test-run`
+attributes (UTC), not the Unity process window. Node 24.15.0 exporter tests: **17/17**;
+`npm.cmd run validate` also succeeds on the one six-row UI workbook.
+
+| Gate | Passed | UTC interval | XML |
+|---|---:|---|---|
+| Directed Config + verified Bootstrap composition, Edit | 11/11 | 07:30:48-07:30:48 | `config-acceptance-directed-editmode.xml` |
+| Directed Config UI/resources, Play | 5/5 | 07:36:49-07:36:52 | `config-acceptance-directed2-playmode.xml` |
+| Full, installed SuperScrollView, Edit | 175/175 | 07:37:05-07:37:08 | `config-acceptance-final2-editmode.xml` |
+| Full, installed SuperScrollView, Play | 153/153 | 07:37:23-07:37:42 | `config-acceptance-final2-playmode.xml` |
+| Full, no vendor, Edit | 175/175 | 07:37:56-07:37:59 | `config-acceptance-no-vendor-final2-editmode.xml` |
+| Full, no vendor, Play | 138/138 | 07:38:14-07:38:30 | `config-acceptance-no-vendor-final2-playmode.xml` |
+
+All six gates have zero failed/skipped/inconclusive tests. Their matching logs have
+zero C# warning/error, Unobserved or NullReference diagnostics. Full Play logs still
+include the deliberately expected duplicate-EventSystem error in its existing regression.
+No user's interactive Unity process was terminated.
+
+Evidence root:
+`C:\Users\21093\.copilot\session-state\7310900a-0fd1-4a43-bd14-c674e24903bf\files`
+
+Validation projects are directly under that root:
+`config-validation-project` (531 Assets/Packages/ProjectSettings files, including local
+licensed integration) and `config-no-vendor-project` (463 files).
+For each project, `{project-name}-source-sha256.json`, `-copy-sha256.json` and
+`-comparison.json` record the complete inputs and zero missing/mismatched/extra files.
+`config-source-readonly-sha256.txt` and `config-source-postintegration-comparison.json`
+verify all 13 inspected MatchingGo source files stayed unchanged.
+`config-acceptance-node-final.log` contains the Node results. These retained copies and
+manifests are session evidence, never framework release assets.
+
+Coverage includes protocol/long/compound keys and actual Node MessagePack output in Unity,
+all six directory-swap failure points, retained metas/unmanaged files, malformed Excel,
+UI schema/codegen validation, required/optional atomic snapshots, retry/reload, shared
+caller cancellation, late noncooperative results and shutdown/reinit, TextAsset/native
+lease cleanup, package-aware prewarm/open, batch zero-partial registration and active
+re-registration rejection, all migrated profiles, actual page navigation, and verified
+Bootstrap -> Config -> UI registration -> business success/failure ordering.
+
+Focused read-only review regressions reject enclosing/generated member collisions,
+reject nested JSON5 nonfinite values before JSON/MessagePack divergence, and exclude
+optional tables whose asset disposal failed. Actual migrated examples also exposed the
+old Arial.ttf runtime exception and singleton button dispatch; these are fixed and covered.
+Config does not claim zero-GC loading or device FPS. Existing stage9/10 allocation
+measurements remain separate full-suite regressions.
+
 ## Test assemblies
 
 - `YUIFramework.Tests.EditMode`: deterministic framework data structures and contracts,

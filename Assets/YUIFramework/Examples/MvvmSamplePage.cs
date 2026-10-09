@@ -68,7 +68,7 @@ namespace YUIFramework
             textRect.anchoredPosition = anchoredPosition;
 
             var text = textRect.gameObject.AddComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             text.alignment = TextAnchor.MiddleCenter;
             text.color = Color.white;
             text.fontSize = fontSize;
@@ -92,7 +92,7 @@ namespace YUIFramework
             var labelRect = CreateUIObject("Label", buttonRect);
             StretchFull(labelRect);
             var label = labelRect.gameObject.AddComponent<Text>();
-            label.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             label.alignment = TextAnchor.MiddleCenter;
             label.color = Color.white;
             label.fontSize = 28;
@@ -131,7 +131,7 @@ namespace YUIFramework
             labelRect.offsetMin = new Vector2(44f, 0f);
             labelRect.offsetMax = Vector2.zero;
             var label = labelRect.gameObject.AddComponent<Text>();
-            label.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             label.alignment = TextAnchor.MiddleLeft;
             label.color = Color.white;
             label.fontSize = 24;

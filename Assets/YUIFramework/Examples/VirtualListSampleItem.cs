@@ -47,7 +47,7 @@ namespace YUIFramework
                 labelRect.offsetMax = new Vector2(-24f, 0f);
 
                 _label = labelRect.gameObject.AddComponent<Text>();
-                _label.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+                _label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
                 _label.alignment = TextAnchor.MiddleLeft;
                 _label.color = Color.white;
                 _label.fontSize = 24;

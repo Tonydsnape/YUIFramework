@@ -260,6 +260,31 @@ namespace YUIFramework
             _configRegistry[typeof(T)] = config;
         }
 
+        public void RegisterBatch(IReadOnlyList<UIConfigRegistration> registrations)
+        {
+            EnsureInitialized();
+            EnsureAcceptingOperations();
+            if (registrations == null) throw new ArgumentNullException(nameof(registrations));
+            var pending = new Dictionary<Type, UIConfig>();
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var config in _configRegistry.Values) ids.Add(config.Id);
+            for (var index = 0; index < registrations.Count; index++)
+            {
+                var registration = registrations[index] ?? throw new ArgumentException("Null registration.");
+                var config = registration.CreateSnapshot();
+                UIConfigRegistration.Validate(config);
+                _rootRuntime.LayerProfile.Get(config.Layer);
+                if (config.PrefabPackage != null &&
+                    (_resourceService == null || !_resourceService.Packages.TryResolve(config.PrefabPackage, out _)))
+                    throw new ArgumentException("Explicit prefab packages require a registered resource-service provider.");
+                if (_configRegistry.ContainsKey(registration.ContextType) ||
+                    pending.ContainsKey(registration.ContextType) || !ids.Add(config.Id))
+                    throw new ArgumentException("Batch cannot replace an existing type or duplicate UI identity.");
+                pending.Add(registration.ContextType, config);
+            }
+            foreach (var pair in pending) _configRegistry.Add(pair.Key, pair.Value);
+        }
+
         public bool IsRegistered<T>() where T : BaseContext
         {
             return _configRegistry.ContainsKey(typeof(T));
@@ -1734,7 +1759,7 @@ namespace YUIFramework
                 if (_resourceService != null)
                 {
                     var lease = await _resourceService.InstantiateAsync(
-                        UIResourceKey.Of<GameObject>(prefabKey),
+                        UIResourceKey.Of<GameObject>(prefabKey, config.PrefabPackage),
                         null,
                         operation.Token);
                     instance = lease.Instance;
@@ -1856,7 +1881,7 @@ namespace YUIFramework
                     try
                     {
                         instanceLease = await _resourceService.InstantiateAsync(
-                            UIResourceKey.Of<GameObject>(prefabKey),
+                            UIResourceKey.Of<GameObject>(prefabKey, config.PrefabPackage),
                             null,
                             operation.Token);
                     }

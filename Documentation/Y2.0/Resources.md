@@ -33,6 +33,13 @@ resource ownership model. YooAsset 3.x is the only production backend.
 
 ## Ownership rules
 
+The independent [Config integration](Config.md) reads TextAsset leases through
+`ResourceConfigSource` and releases each before snapshot publication. Config shutdown
+does not shut down its borrowed resource service. `UIConfig.PrefabPackage` now propagates
+to both instance prewarm and normal open; null preserves the existing default-package
+behavior. The production startup order remains verified Bootstrap resources, Config,
+typed UI batch registration, then business entry.
+
 1. **Single-flight.** Concurrent loads of the same key trigger exactly one native load.
    Every caller receives its own independent lease over the same underlying asset.
 2. **Independent leases.** Releasing one lease never affects another holder.

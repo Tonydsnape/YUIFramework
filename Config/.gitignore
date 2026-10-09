@@ -1,0 +1,7 @@
+node_modules/
+.test-work/
+Client/
+Server/
+*.staging-*
+*.backup-*
+.export-lock/

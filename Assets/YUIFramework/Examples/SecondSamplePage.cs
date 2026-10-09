@@ -1,4 +1,5 @@
 using UnityEngine;
+using Cysharp.Threading.Tasks;
 using UnityEngine.Events;
 using UnityEngine.UI;
 
@@ -30,7 +31,7 @@ namespace YUIFramework
 
             var textRect = CreateUIObject("Message", panel);
             _messageText = textRect.gameObject.AddComponent<Text>();
-            _messageText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            _messageText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             _messageText.alignment = TextAnchor.MiddleCenter;
             _messageText.color = Color.white;
             _messageText.fontSize = 38;
@@ -51,13 +52,13 @@ namespace YUIFramework
             var labelRect = CreateUIObject("Label", backRect);
             StretchFull(labelRect);
             var label = labelRect.gameObject.AddComponent<Text>();
-            label.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             label.alignment = TextAnchor.MiddleCenter;
             label.color = Color.white;
             label.fontSize = 28;
             label.text = "Back";
 
-            _backAction = async () => await UIManager.Instance.Navigator.BackAsync();
+            _backAction = () => Services.Navigator.BackAsync().Forget(Debug.LogException);
             _backButton.onClick.AddListener(_backAction);
         }
 

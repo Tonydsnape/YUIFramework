@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using YUIFramework.Configuration;
 
 namespace YUIFramework
 {
@@ -10,7 +11,7 @@ namespace YUIFramework
     /// </summary>
     public class HelloUIBootstrap : MonoBehaviour
     {
-        private IUIService _uiService;
+        private UIManager _uiService;
 
         private void Start()
         {
@@ -20,6 +21,7 @@ namespace YUIFramework
         private async UniTask RunAsync(CancellationToken cancellationToken)
         {
             _uiService = new UIManager();
+            var configOwner = new SampleConfigOwner();
             try
             {
                 var rootRuntime = UIRootRuntime.CreateOwned();
@@ -28,63 +30,10 @@ namespace YUIFramework
                     rootRuntime,
                     cancellationToken: cancellationToken);
 
-                _uiService.Register<SampleHelloPage>(new UIConfig
-                {
-                    Id = "HelloPage",
-                    PrefabKey = "SampleHelloPage",
-                    Layer = UILayer.Normal,
-                    CacheOnClose = true,
-                    MaxPoolSize = 1,
-                    FullScreen = true,
-                    UseTransition = true,
-                    TransitionType = UITransitionType.Fade,
-                    ShowDuration = 0.2f,
-                    HideDuration = 0.15f,
-                });
-                _uiService.Register<SecondSamplePage>(new UIConfig
-                {
-                    Id = "SecondSamplePage",
-                    PrefabKey = "SecondSamplePage",
-                    Layer = UILayer.Normal,
-                    CacheOnClose = false,
-                    FullScreen = true,
-                    UseTransition = true,
-                    TransitionType = UITransitionType.SlideLeft,
-                    ShowDuration = 0.25f,
-                    HideDuration = 0.2f,
-                    SlideDistance = 900f,
-                });
-                _uiService.Register<VirtualListSamplePage>(new UIConfig
-                {
-                    Id = "VirtualListSamplePage",
-                    PrefabKey = "VirtualListSamplePage",
-                    Layer = UILayer.Normal,
-                    CacheOnClose = true,
-                    MaxPoolSize = 1,
-                    FullScreen = true,
-                    UseTransition = true,
-                    TransitionType = UITransitionType.Scale,
-                    ShowDuration = 0.2f,
-                    HideDuration = 0.15f,
-                    StartScale = 0.92f,
-                });
-                _uiService.Register<MvvmSamplePage>(new UIConfig
-                {
-                    Id = "MvvmSamplePage",
-                    PrefabKey = "MvvmSamplePage",
-                    Layer = UILayer.Normal,
-                    CacheOnClose = true,
-                    MaxPoolSize = 1,
-                    FullScreen = true,
-                    UseTransition = true,
-                    TransitionType = UITransitionType.Fade,
-                    ShowDuration = 0.18f,
-                    HideDuration = 0.15f,
-                });
-
-                await _uiService.Navigator.PushAsync<SampleHelloPage>(
-                    "Hello YUIFramework!",
-                    cancellationToken: cancellationToken);
+                await ConfigUIStartup.EnterAsync(configOwner.Service, _uiService,
+                    snapshot => SampleUIConfiguration.Map(snapshot, "hello"),
+                    async token => { await _uiService.Navigator.PushAsync<SampleHelloPage>(
+                        "Hello YUIFramework!", cancellationToken: token); }, cancellationToken);
                 await UniTask.WaitUntilCanceled(cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -92,10 +41,8 @@ namespace YUIFramework
             }
             finally
             {
-                if (_uiService.IsInitialized)
-                {
-                    await _uiService.ShutdownAsync();
-                }
+                try { if (_uiService.IsInitialized) await _uiService.ShutdownAsync(); }
+                finally { await configOwner.ShutdownAsync(); }
             }
         }
     }

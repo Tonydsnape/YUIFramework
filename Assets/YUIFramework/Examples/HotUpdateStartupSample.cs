@@ -5,6 +5,7 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 using YUIFramework.Bootstrap;
 using YUIFramework.Bootstrap.YooAsset;
+using YUIFramework.Configuration;
 
 namespace YUIFramework
 {
@@ -23,10 +24,13 @@ namespace YUIFramework
         private BootstrapRunner _runner;
         private YooAssetBootstrapComposition _composition;
         private UIManager _uiService;
+        private ConfigService _configs;
+        private UniTask _runTask;
 
         private void Start()
         {
-            RunAsync(destroyCancellationToken).Forget(HandleException);
+            _runTask = RunAsync(destroyCancellationToken).Preserve();
+            _runTask.Forget(HandleException);
         }
 
         private void OnDestroy()
@@ -57,18 +61,18 @@ namespace YUIFramework
                 _composition.ResourceService,
                 cancellationToken: cancellationToken);
 
-            _uiService.Register<SampleHelloPage>(new UIConfig
-            {
-                Id = "HelloPage",
-                PrefabKey = "SampleHelloPage",
-                Layer = UILayer.Normal,
-                CacheOnClose = true,
-                MaxPoolSize = 1,
-                FullScreen = true,
-            });
-            await _uiService.Navigator.PushAsync<SampleHelloPage>(
-                "Hello YUIFramework Bootstrap!",
-                cancellationToken: cancellationToken);
+#if UNITY_EDITOR
+            if (playMode == BootstrapMode.EditorSimulate)
+                _configs = SampleUIConfiguration.Create(new EditorJsonConfigSource(), ConfigFormat.Json);
+            else
+#endif
+                _configs = SampleUIConfiguration.Create(
+                new ResourceConfigSource(_composition.ResourceService, packageName),
+                ConfigFormat.MessagePack);
+            await ConfigUIStartup.EnterAsync(_configs, _uiService,
+                snapshot => SampleUIConfiguration.Map(snapshot, "bootstrap"),
+                async token => { await _uiService.Navigator.PushAsync<SampleHelloPage>(
+                    "Hello YUIFramework Bootstrap!", cancellationToken: token); }, cancellationToken);
         }
 
         private BootstrapProfile CreateProfile()
@@ -93,6 +97,9 @@ namespace YUIFramework
         private async UniTask ShutdownAsync()
         {
             var failures = new List<Exception>();
+            try { await _runTask; }
+            catch (OperationCanceledException) { }
+            catch (Exception exception) { failures.Add(exception); }
             if (_uiService != null && _uiService.IsInitialized)
             {
                 try
@@ -103,6 +110,13 @@ namespace YUIFramework
                 {
                     failures.Add(exception);
                 }
+            }
+
+            if (_configs != null)
+            {
+                try { await _configs.ShutdownAsync(); }
+                catch (Exception exception) { failures.Add(exception); }
+                _configs = null;
             }
 
             if (_composition != null)

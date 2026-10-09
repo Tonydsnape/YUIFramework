@@ -19,6 +19,7 @@ Y2.0 正在按阶段建立商用基线。阶段 0 到阶段 6 已完成：除阶
 - Y2 运行时契约：[`Documentation/Y2.0/Contracts.md`](Documentation/Y2.0/Contracts.md)
 - 资源所有权体系：[`Documentation/Y2.0/Resources.md`](Documentation/Y2.0/Resources.md)
 - 资源 Bootstrap：[`Documentation/Y2.0/Bootstrap.md`](Documentation/Y2.0/Bootstrap.md)
+- Excel 配置与现有 UI 注册迁移：[`Documentation/Y2.0/Config.md`](Documentation/Y2.0/Config.md)
 - Bootstrap 迁移：[`Documentation/Y2.0/Migration.md`](Documentation/Y2.0/Migration.md)
 - 测试说明：[`Documentation/Y2.0/Testing.md`](Documentation/Y2.0/Testing.md)
 - 变更记录：[`CHANGELOG.md`](CHANGELOG.md)
@@ -112,44 +113,24 @@ P7 生命周期语义：
 
 ## 快速开始
 
-1. 在场景中创建空物体，挂载 `HelloUIBootstrap`。
-2. 运行场景后会自动初始化框架并打开示例页面。
+1. 在 `Config` 目录执行 `npm.cmd ci --ignore-scripts`、`npm.cmd run export:client`。
+2. 在场景中创建空物体，挂载 `HelloUIBootstrap`。
+3. 运行后先加载生成的配置表，再按显式 Context 映射批量注册并打开页面。
 
-最小示例：
+现有 3 个启动入口、6 条 UI 注册已全部迁移，参数保持各自 profile 原值。
+维护 `Config/UISettings.xlsx` 后重新导出即可；加载失败不会回退到手写注册。
+完整所有权/清理示例见 `Examples/HelloUIBootstrap.cs`，核心链路如下：
 
 ```csharp
-using Cysharp.Threading.Tasks;
-using UnityEngine;
-using YUIFramework;
-
-public class HelloUIBootstrap : MonoBehaviour
-{
-    private void Start()
-    {
-        RunAsync(destroyCancellationToken).Forget(Debug.LogException);
-    }
-
-    private async UniTask RunAsync(System.Threading.CancellationToken cancellationToken)
-    {
-        var uiManager = new UIManager();
-        await uiManager.InitializeAsync(
-            new CodeViewLoader(),
-            cancellationToken: cancellationToken);
-        uiManager.Register<SampleHelloPage>(new UIConfig
-        {
-            Id = "HelloPage",
-            PrefabKey = "SampleHelloPage",
-            Layer = UILayer.Normal,
-            CacheOnClose = true,
-            MaxPoolSize = 1,
-            FullScreen = true,
-        });
-
-        await uiManager.Navigator.PushAsync<SampleHelloPage>(
-            "Hello YUIFramework!",
-            cancellationToken: cancellationToken);
-    }
-}
+var ui = new UIManager();
+var configOwner = new SampleConfigOwner();
+await ui.InitializeAsync(new CodeViewLoader(), cancellationToken: cancellationToken);
+await ConfigUIStartup.EnterAsync(configOwner.Service, ui,
+    snapshot => SampleUIConfiguration.Map(snapshot, "hello"),
+    async token => { await ui.Navigator.PushAsync<SampleHelloPage>(
+        "Hello YUIFramework!", cancellationToken: token); },
+    cancellationToken);
+// 所有者退出时依次 await ui.ShutdownAsync()、configOwner.ShutdownAsync()。
 ```
 
 ## P2 用法示例
@@ -313,7 +294,8 @@ staggered 布局未由当前适配器提供；不根据供应商 Demo 名称推�
 
 ## P7 UI 转场动画 / 页面过渡系统
 
-P7 新增 `Runtime/Transitions`，默认不开启。单个页面可在 `UIConfig` 中配置：
+P7 新增 `Runtime/Transitions`，默认不开启。新业务通过 Excel 对应字段配置；
+以下保留为 `Register<T>(UIConfig)` 兼容 API 示例，不再是启动入口的推荐写法：
 
 ```csharp
 uiManager.Register<MainMenuPageContext>(new UIConfig

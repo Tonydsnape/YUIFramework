@@ -6,6 +6,14 @@ All notable changes to YUIFramework are documented in this file.
 
 ### Added
 
+- Independent post-stage-10 Config integration: validated Excel base/normal protocol,
+  JSON/MessagePack and typed C# generation with multi-directory rollback, instance-scoped
+  atomic ConfigService snapshots, cancellation/reload/lease ownership and explicit UI batches.
+- Migrated all six existing example UI registrations to the UISettings workbook and
+  typed profile mappings; preserved manual Register compatibility and stage 11 boundary.
+- Config protocol/transaction, real generated-table, Bootstrap composition and
+  UI/resource regression gates; pinned Newtonsoft/MessagePack dependencies.
+
 - Y2.0 baseline documentation and Y1-to-Y2 API migration matrix.
 - EditMode characterization tests for pooling, messaging, observable properties, and transition configuration.
 - PlayMode characterization tests for registration, lifecycle, caching, and stack navigation.

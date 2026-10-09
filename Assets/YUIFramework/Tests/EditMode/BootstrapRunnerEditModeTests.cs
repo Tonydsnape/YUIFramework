@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using YUIFramework.Bootstrap;
+using YUIFramework.Configuration;
 using UnityEngine.TestTools;
 
 namespace YUIFramework.Tests
@@ -14,6 +15,50 @@ namespace YUIFramework.Tests
     public sealed class BootstrapRunnerEditModeTests
     {
         private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(10);
+
+        [UnityTest]
+        public IEnumerator ConfigIntegration_VerifiedBootstrapRegistersBeforeBusinessAndStopsOnConfigFailure() =>
+            AwaitTest(ConfigIntegrationAsync());
+
+        private async Task ConfigIntegrationAsync()
+        {
+            foreach (var valid in new[] { true, false })
+            {
+                var fixture = new Fixture();
+                fixture.Backend.SetPlan("DefaultPackage", 1, 64);
+                var ui = new UIManager();
+                var configs = SampleUIConfiguration.Create(
+                    valid ? new EditorJsonConfigSource() : new EditorJsonConfigSource("Assets/MissingConfig"),
+                    ConfigFormat.Json);
+                var businessEntered = false;
+                fixture.GameEntry.Handler = async (context, token) =>
+                {
+                    Assert.That(fixture.Backend.VerifyCalls, Is.EqualTo(1));
+                    Assert.That(context.Packages[0].IsManifestVerified, Is.True);
+                    await ui.InitializeAsync(new CodeViewLoader(), cancellationToken: token);
+                    await ConfigUIStartup.EnterAsync(configs, ui,
+                        snapshot => SampleUIConfiguration.Map(snapshot, "bootstrap"), businessToken =>
+                        {
+                            Assert.That(ui.IsRegistered<SampleHelloPage>(), Is.True);
+                            businessEntered = true;
+                            return UniTask.CompletedTask;
+                        }, token);
+                };
+                try
+                {
+                    var result = await fixture.Runner.RunAsync(CreateProfile());
+                    Assert.That(result.IsSuccess, Is.EqualTo(valid));
+                    Assert.That(businessEntered, Is.EqualTo(valid));
+                    Assert.That(ui.IsRegistered<SampleHelloPage>(), Is.EqualTo(valid));
+                }
+                finally
+                {
+                    if (ui.IsInitialized) await ui.ShutdownAsync();
+                    await configs.ShutdownAsync();
+                    await fixture.Runner.ShutdownAsync();
+                }
+            }
+        }
 
         [UnityTest]
         public IEnumerator EditorSimulate_HasDeterministicSuccessfulPath() =>
@@ -1447,6 +1492,7 @@ namespace YUIFramework.Tests
             public int CallCount { get; private set; }
             public Exception Failure { get; set; }
             public bool Block { get; set; }
+            public Func<BootstrapReadyContext, CancellationToken, UniTask> Handler { get; set; }
 
             public async UniTask EnterAsync(
                 BootstrapReadyContext context,
@@ -1464,6 +1510,7 @@ namespace YUIFramework.Tests
                 {
                     await _gate.Task;
                 }
+                if (Handler != null) await Handler(context, cancellationToken);
             }
 
             public void Release()

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Cysharp.Threading.Tasks;
 using UnityEngine.Events;
 using UnityEngine.UI;
 #pragma warning disable CS0618 // Legacy sample deliberately exercises the migration facade.
@@ -43,7 +44,7 @@ namespace YUIFramework
             title.sizeDelta = new Vector2(0f, 80f);
             title.anchoredPosition = new Vector2(0f, 0f);
             _titleText = title.gameObject.AddComponent<Text>();
-            _titleText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            _titleText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             _titleText.alignment = TextAnchor.MiddleCenter;
             _titleText.color = Color.white;
             _titleText.fontSize = 30;
@@ -104,13 +105,13 @@ namespace YUIFramework
             var backLabelRect = CreateUIObject("Label", backRect);
             StretchFull(backLabelRect);
             var backLabel = backLabelRect.gameObject.AddComponent<Text>();
-            backLabel.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            backLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             backLabel.alignment = TextAnchor.MiddleCenter;
             backLabel.color = Color.white;
             backLabel.fontSize = 28;
             backLabel.text = "Back";
 
-            _backAction = async () => await UIManager.Instance.Navigator.BackAsync();
+            _backAction = () => Services.Navigator.BackAsync().Forget(Debug.LogException);
             _backButton.onClick.AddListener(_backAction);
         }
 

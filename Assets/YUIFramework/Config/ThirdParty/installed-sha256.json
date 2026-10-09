@@ -1,0 +1,37 @@
+﻿[
+    {
+        "id":  "MessagePack",
+        "version":  "3.1.4",
+        "dll":  "MessagePack.dll",
+        "sha256":  "A8ADB074EABE3E1508449936E396C9FFA4DD64D21B7CD1578C1D436D75BD708F",
+        "nupkgSha256":  "A23BBF857FAFC1916A49AF4E4526B9F13A0CDDC13B7C5F31DF88B6A0D2C6355A"
+    },
+    {
+        "id":  "MessagePack.Annotations",
+        "version":  "3.1.4",
+        "dll":  "MessagePack.Annotations.dll",
+        "sha256":  "4D7AA07D288C6A39109EEDF6435E3BA8C413342876ED08BB5A64D55DD39DD04D",
+        "nupkgSha256":  "61918A6B6D2C89A6DBE15210AE2E5D32E1709C3C57D7D1ED7F9D671AB20FC76F"
+    },
+    {
+        "id":  "Microsoft.NET.StringTools",
+        "version":  "17.11.4",
+        "dll":  "Microsoft.NET.StringTools.dll",
+        "sha256":  "391643A1DB7C8730CA829E3FA461F804047DC9DB51E13E5A64D4B59B844664A5",
+        "nupkgSha256":  "9567F3637E5643E88A4BD4E9BB3B434E58E017D088391845845126D29D5D5411"
+    },
+    {
+        "id":  "System.Collections.Immutable",
+        "version":  "8.0.0",
+        "dll":  "System.Collections.Immutable.dll",
+        "sha256":  "5B1B1C83BA3D135C2FDFE425842FBE9C7432878B7E468623ACB554C69B4C130F",
+        "nupkgSha256":  "17B3958CA370A6A6D487C95389D6EA256622E3BEA7B2AF67FBA934F90551A37C"
+    },
+    {
+        "id":  "System.Runtime.CompilerServices.Unsafe",
+        "version":  "6.0.0",
+        "dll":  "System.Runtime.CompilerServices.Unsafe.dll",
+        "sha256":  "01748200F2400C742AA689F1F5101BD6298EFDFD92C00C18F4FA473847235BA9",
+        "nupkgSha256":  "6C41B53E70E9EEE298CFF3A02CE5ACDD15B04125589BE0273F0566026720A762"
+    }
+]

@@ -4,6 +4,11 @@ Y2.0 uses one development line and advances through strict stage gates. Only one
 
 **Progress: stages 0-10 complete (11 of 17 stages). Stage 11 has not started.**
 
+Independent post-stage-10 work: **Config integration complete**. This connects the
+Excel toolchain, atomic typed snapshots and existing UI registrations; it does not
+renumber the roadmap or begin stage 11. Acceptance: Node 17/17, installed-vendor
+EditMode 175/175 and PlayMode 153/153, no-vendor 175/175 and 138/138; see Testing.md.
+
 ## Fixed decisions
 
 - Unity 2022.3 LTS, verified with 2022.3.62f2.

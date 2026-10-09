@@ -1,0 +1,5 @@
+{
+  "name": "YUIFramework.Config",
+  "references": ["YUIFramework.Runtime", "UniTask", "Unity.Newtonsoft.Json"],
+  "autoReferenced": true
+}

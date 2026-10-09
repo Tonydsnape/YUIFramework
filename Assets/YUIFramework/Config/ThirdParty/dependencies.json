@@ -1,0 +1,10 @@
+{
+  "framework": "netstandard2.1 (Unity 2022.3)",
+  "packages": [
+    { "id": "MessagePack", "version": "3.1.4", "asset": "lib/netstandard2.1/MessagePack.dll" },
+    { "id": "MessagePack.Annotations", "version": "3.1.4", "asset": "lib/netstandard2.0/MessagePack.Annotations.dll" },
+    { "id": "Microsoft.NET.StringTools", "version": "17.11.4", "asset": "lib/netstandard2.0/Microsoft.NET.StringTools.dll" },
+    { "id": "System.Collections.Immutable", "version": "8.0.0", "asset": "lib/netstandard2.0/System.Collections.Immutable.dll" },
+    { "id": "System.Runtime.CompilerServices.Unsafe", "version": "6.0.0", "asset": "lib/netstandard2.0/System.Runtime.CompilerServices.Unsafe.dll" }
+  ]
+}

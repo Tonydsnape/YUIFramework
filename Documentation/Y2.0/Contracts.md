@@ -45,6 +45,13 @@ Lifecycle callback failures record `LastFailure` and surface as metadata-rich `U
 
 ## Registry
 
+The independent [Config integration](Config.md) adds `ConfigService` atomic typed
+snapshots and `UIManager.RegisterBatch(IReadOnlyList<UIConfigRegistration>)`.
+`UIConfigRegistration.For<T>` validates and copies input; batches never replace existing
+types/identities, and invalid batches insert nothing. `ConfigUIStartup` loads before
+mapping/registering and enters business code only after success. Config and resources
+remain separately owned; shutdown order is UI, Config, resources, Bootstrap.
+
 `IUIRegistry` provides:
 
 - `Register<T>(UIConfig)`

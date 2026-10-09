@@ -1,4 +1,5 @@
 using UnityEngine;
+using Cysharp.Threading.Tasks;
 using UnityEngine.Events;
 using UnityEngine.UI;
 
@@ -37,7 +38,7 @@ namespace YUIFramework
 
             var textRect = CreateUIObject("Message", panel);
             _messageText = textRect.gameObject.AddComponent<Text>();
-            _messageText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            _messageText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             _messageText.alignment = TextAnchor.MiddleCenter;
             _messageText.color = Color.white;
             _messageText.fontSize = 42;
@@ -58,7 +59,7 @@ namespace YUIFramework
             var labelRect = CreateUIObject("Label", buttonRect);
             StretchFull(labelRect);
             var label = labelRect.gameObject.AddComponent<Text>();
-            label.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             label.alignment = TextAnchor.MiddleCenter;
             label.color = Color.white;
             label.fontSize = 28;
@@ -79,18 +80,19 @@ namespace YUIFramework
             var nextLabelRect = CreateUIObject("Label", nextRect);
             StretchFull(nextLabelRect);
             var nextLabel = nextLabelRect.gameObject.AddComponent<Text>();
-            nextLabel.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            nextLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             nextLabel.alignment = TextAnchor.MiddleCenter;
             nextLabel.color = Color.white;
             nextLabel.fontSize = 28;
             nextLabel.text = "Next";
 
-            _closeAction = async () => await UIManager.Instance.CloseAsync(this);
-            _nextAction = async () =>
+            _closeAction = () => Services.CloseAsync(this).Forget(Debug.LogException);
+            _nextAction = () => OpenSecondAsync().Forget(Debug.LogException);
+            async UniTask OpenSecondAsync()
             {
-                await UIManager.Instance.Navigator.PushAsync<SecondSamplePage>("Welcome to SecondSamplePage");
+                await Services.Navigator.PushAsync<SecondSamplePage>("Welcome to SecondSamplePage");
                 PublishMessage(SampleMessages.Hello, "Hello from SampleHelloPage");
-            };
+            }
             _publishAction = () =>
                 PublishMessage(SampleMessages.Hello, "Hello from SampleHelloPage");
             _closeButton.onClick.AddListener(_closeAction);
@@ -111,13 +113,13 @@ namespace YUIFramework
             var virtualListLabelRect = CreateUIObject("Label", virtualListRect);
             StretchFull(virtualListLabelRect);
             var virtualListLabel = virtualListLabelRect.gameObject.AddComponent<Text>();
-            virtualListLabel.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            virtualListLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             virtualListLabel.alignment = TextAnchor.MiddleCenter;
             virtualListLabel.color = Color.white;
             virtualListLabel.fontSize = 26;
             virtualListLabel.text = "Open Virtual List";
 
-            _virtualListAction = async () => await UIManager.Instance.Navigator.PushAsync<VirtualListSamplePage>();
+            _virtualListAction = () => Services.Navigator.PushAsync<VirtualListSamplePage>().Forget(Debug.LogException);
             _virtualListButton.onClick.AddListener(_virtualListAction);
 
             var mvvmRect = CreateUIObject("MvvmSampleButton", panel);
@@ -135,13 +137,13 @@ namespace YUIFramework
             var mvvmLabelRect = CreateUIObject("Label", mvvmRect);
             StretchFull(mvvmLabelRect);
             var mvvmLabel = mvvmLabelRect.gameObject.AddComponent<Text>();
-            mvvmLabel.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            mvvmLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             mvvmLabel.alignment = TextAnchor.MiddleCenter;
             mvvmLabel.color = Color.white;
             mvvmLabel.fontSize = 26;
             mvvmLabel.text = "Open MVVM Sample";
 
-            _mvvmAction = async () => await UIManager.Instance.Navigator.PushAsync<MvvmSamplePage>();
+            _mvvmAction = () => Services.Navigator.PushAsync<MvvmSamplePage>().Forget(Debug.LogException);
             _mvvmButton.onClick.AddListener(_mvvmAction);
 
             var publishRect = CreateUIObject("PublishMessageButton", panel);
@@ -160,7 +162,7 @@ namespace YUIFramework
             var publishLabelRect = CreateUIObject("Label", publishRect);
             StretchFull(publishLabelRect);
             var publishLabel = publishLabelRect.gameObject.AddComponent<Text>();
-            publishLabel.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            publishLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             publishLabel.alignment = TextAnchor.MiddleCenter;
             publishLabel.color = Color.white;
             publishLabel.fontSize = 28;
@@ -169,6 +171,9 @@ namespace YUIFramework
 
         protected override void HandleShow(object args)
         {
+            _nextButton.interactable = Services.IsRegistered<SecondSamplePage>();
+            _virtualListButton.interactable = Services.IsRegistered<VirtualListSamplePage>();
+            _mvvmButton.interactable = Services.IsRegistered<MvvmSamplePage>();
             var message = args as string;
             if (string.IsNullOrEmpty(message))
             {

@@ -6,7 +6,7 @@ This matrix records intent before implementation. Final Y2 names may be refined 
 |---|---|---|
 | `UIManager.Instance` | Injected `IUIService` | Temporary facade; Y2 service available |
 | `UIManager.Init` | `Initialize` / `InitializeAsync` / `ShutdownAsync` | Obsolete forwarding overload implemented |
-| `Register<T>(UIConfig)` | Registry with validated immutable descriptor | Temporary adapter |
+| `Register<T>(UIConfig)` | Excel `UISettings` + explicit `UIConfigRegistration.For<T>` + `UIManager.RegisterBatch` | Manual mutable registration remains compatible; new batch inputs are validated copies |
 | `OpenAsync<T>(object)` | UniTask/cancellation now; typed request later | `OpenHandleAsync<T>` added, object arguments retained |
 | `CloseAsync<T>()` | UniTask/cancellation and owning-service handle | Existing overload retained |
 | `UINavigator` | `IUINavigator`; command queue and transactions next | Interface and cancellation implemented; stage 3 adds FIFO queue, `IsBusy`, `BringToTopAsync<T>`, `NavigateBackAsync`, guards, and transaction rollback |
@@ -31,7 +31,7 @@ This matrix records intent before implementation. Final Y2 names may be refined 
 | Legacy list padding/end alignment | Parent viewport padding / typed leading scroll offset | Unsupported legacy options throw; see `Virtualization.md` |
 | Context-owned ViewModel by assumption | `SetViewModel(vm, UIViewModelOwnership)` | Default remains `Owned`; borrowed instances opt into `External` |
 | `Task` runtime APIs | `UniTask` + `CancellationToken` | Runtime migration implemented |
-| Mutable `UIConfig` fields | Validated descriptor/config asset | Import/conversion helper |
+| Mutable `UIConfig` fields | `ConfigService` typed snapshots and copied batch input | No global freeze or automatic active re-registration; see `Config.md` |
 | `DefaultLayer` plus config layer | Single authoritative layer source | Resolve during contract phase |
 | `PreloadCount` placeholder | `UIManager.PrewarmAsync<T>` initialized-instance target | Requires caching/capacity; distinct from resource preload |
 | Per-type stack pool | Owned entries with per-key/global capacity, priority/LRU, expiry and scopes | Existing `CacheOnClose`/`MaxPoolSize` remain authoritative |
