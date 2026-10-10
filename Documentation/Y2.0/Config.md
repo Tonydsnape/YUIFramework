@@ -1,7 +1,9 @@
 # Typed Config integration
 
 This independent post-stage-10 addition integrates the user-owned MatchingGo Config
-protocol. It does **not** begin stage 11, add themes/localization, or install HybridCLR.
+protocol. That independently accepted change did not begin stage 11 or install HybridCLR.
+The subsequent [text-localization subitem](Localization.md) reuses this pipeline;
+themes, safe area and localized font/sprite resources remain outside this task.
 The source game is read-only. Reused components are the generic Excel parser/error
 model, JSON/MessagePack layout, code-generator structure, validation/report utilities and
 ConfigValue/key helpers. GameConfig statics, CardCollect phases, game repositories,
@@ -66,6 +68,11 @@ objects; the service cannot make an arbitrary caller type immutable.
   the owner run, and prevents initialization until drain finishes. A late noncooperative
   source cannot publish or resurrect a previous run. Reinitialization is then permitted.
   A source that never completes can still delay drain; arbitrary work cannot be forcibly stopped.
+- `SnapshotChanged` notifies after successful publication and shutdown invalidation.
+  It dispatches all captured observers and aggregates failures after commit.
+  `LastNotificationFailure` distinguishes these from data-load `LastFailure`.
+  Initialize/Reload/Shutdown surface observer errors, without undoing a committed snapshot.
+  Reentrant Config mutation inside the notification is rejected; reads are permitted.
 - Sources, resource service and descriptors are borrowed. Config never shuts down injected
   resources. `ResourceConfigSource` releases every TextAsset lease, including failure/cancel.
   Zero-reference resource cache may remain until its owning service trims/shuts down.
@@ -139,7 +146,7 @@ entry. The generic Bootstrap state machine does not require every game to use Co
 In EditorSimulate, the sample explicitly reads
 `Assets/YUIFramework/ConfigData/Editor/json/UISettings.json` through EditorJsonConfigSource.
 In Offline/Host and Player, it reads the MessagePack TextAsset through the verified resource
-service at **packageName + address `UISettings`**. Configure YooAsset's collector for
+service at **packageName + addresses `UISettings` and `LocalizationTextConfig`**. Configure YooAsset's collector for
 `Assets/Resources/YUIConfig/UISettings.bytes`, address rule filename-without-extension,
 in that package; JSON and generated C# are not bundle assets. If the collector uses another
 address convention, set `ResourceConfigSource`'s explicit prefix/suffix/package accordingly.
@@ -151,7 +158,8 @@ to handwritten config. Production apps should move/configure their bytes outside
 if avoiding built-in duplication, and collect them with YooAsset; the fixed default sync
 location is for this repository's minimal samples.
 
-Owner teardown is **UI -> Config -> resource service -> Bootstrap backend**. The production
+With text localization composed, owner teardown is **UI -> localization Dispose ->
+Config -> resource service -> Bootstrap backend**. The production
 sample first awaits its canceled startup task to prevent late entry/reinitialization during
 teardown, then attempts each shutdown even if another fails. Config's own shutdown does not
 depend on UI state or end active UI scopes. Do not dispose external models/services.

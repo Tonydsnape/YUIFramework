@@ -22,6 +22,20 @@ Shutdown stops both the per-type operation coordinator and the navigator's FIFO 
 
 ## Initialization rules
 
+The optional [text localization](Localization.md) service borrows the instance Config
+owner, reads its immutable catalog and never owns table leases or a second config store.
+`ConfigLocalizedText.Bind(service, context)` follows the actual display token;
+disable detaches observers, resume refreshes, and closed/pool contexts cannot retain
+active display subscriptions. Strict `Get/TryGet` distinguish fallback from exact success.
+Dispose localization after UI cleanup and before Config/resources.
+
+The optional [presentation service](Presentation.md) borrows Config/text/resources
+and the existing transition runner. Typed theme tokens read the published snapshot;
+asset bindings own per-display font/sprite/material leases and fence stale results.
+Scaling restores a captured baseline. Safe-area bindings inset content only,
+never layer roots or modal blockers. Teardown adds presentation Dispose between UI
+and text cleanup; external services remain alive.
+
 - `Initialize` and `InitializeAsync` may only be called while uninitialized.
 - Repeated initialization throws `InvalidOperationException`.
 - A canceled `InitializeAsync` throws before changing service state.

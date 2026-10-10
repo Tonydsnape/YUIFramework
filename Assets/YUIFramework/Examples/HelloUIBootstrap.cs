@@ -3,6 +3,7 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using YUIFramework.Configuration;
+using YUIFramework.Localization;
 
 namespace YUIFramework
 {
@@ -22,6 +23,8 @@ namespace YUIFramework
         {
             _uiService = new UIManager();
             var configOwner = new SampleConfigOwner();
+            using var localization = new TextLocalizationService(configOwner.Service, "en");
+            UIPresentationService presentation = null;
             try
             {
                 var rootRuntime = UIRootRuntime.CreateOwned();
@@ -29,11 +32,12 @@ namespace YUIFramework
                     new CodeViewLoader(),
                     rootRuntime,
                     cancellationToken: cancellationToken);
+                presentation = new UIPresentationService(configOwner.Service, localization, configOwner.SampleResources, _uiService.Transitions);
 
                 await ConfigUIStartup.EnterAsync(configOwner.Service, _uiService,
                     snapshot => SampleUIConfiguration.Map(snapshot, "hello"),
                     async token => { await _uiService.Navigator.PushAsync<SampleHelloPage>(
-                        "Hello YUIFramework!", cancellationToken: token); }, cancellationToken);
+                        new SampleLocalizedHelloArgs(localization, "YUIFramework", presentation), cancellationToken: token); }, cancellationToken);
                 await UniTask.WaitUntilCanceled(cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -42,7 +46,11 @@ namespace YUIFramework
             finally
             {
                 try { if (_uiService.IsInitialized) await _uiService.ShutdownAsync(); }
-                finally { await configOwner.ShutdownAsync(); }
+                finally
+                {
+                    try { try { presentation?.Dispose(); } finally { localization.Dispose(); } }
+                    finally { await configOwner.ShutdownAsync(); }
+                }
             }
         }
     }

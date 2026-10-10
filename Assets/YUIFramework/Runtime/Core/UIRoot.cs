@@ -15,6 +15,7 @@ namespace YUIFramework
         private readonly Dictionary<UILayer, RectTransform> _layerRoots = new Dictionary<UILayer, RectTransform>();
         private readonly List<GameObject> _generatedLayers = new List<GameObject>();
         private UIRootRuntime _owner;
+        private Action _restoreScaler;
 
         [Obsolete("Inject UIRootRuntime into UIManager. Instance no longer creates or searches for objects.")]
         public static UIRoot Instance
@@ -106,12 +107,15 @@ namespace YUIFramework
             }
 
             ClearGeneratedLayers();
+            _restoreScaler?.Invoke();
+            _restoreScaler = null;
         }
 
         internal void Configure(
             UILayerProfile profile,
             RenderMode renderMode,
-            Camera eventCamera)
+            Camera eventCamera,
+            UIScalePolicy scalePolicy = null)
         {
             if (profile == null)
             {
@@ -137,8 +141,20 @@ namespace YUIFramework
 
             canvas.renderMode = renderMode;
             canvas.worldCamera = renderMode == RenderMode.ScreenSpaceOverlay ? null : eventCamera;
+            var oldMode = scaler.uiScaleMode;
+            var oldResolution = scaler.referenceResolution;
+            var oldMatchMode = scaler.screenMatchMode;
+            var oldMatch = scaler.matchWidthOrHeight;
+            _restoreScaler = () => {
+                if (!scaler) return;
+                scaler.uiScaleMode = oldMode; scaler.referenceResolution = oldResolution;
+                scaler.screenMatchMode = oldMatchMode; scaler.matchWidthOrHeight = oldMatch;
+            };
+            scalePolicy = scalePolicy ?? UIScalePolicy.Default;
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.referenceResolution = scalePolicy.ReferenceResolution;
+            scaler.screenMatchMode = scalePolicy.Mode;
+            scaler.matchWidthOrHeight = scalePolicy.Match;
             raycaster.enabled = true;
 
             ClearGeneratedLayers();

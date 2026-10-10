@@ -7,6 +7,20 @@ using YUIFramework.Configuration;
 namespace YUIFramework.ConfigGenerated
 {
 
+    public static class LocalizationTextConfig
+    {
+        public static ConfigTable<global::YUIFramework.Localization.LocalizationTextCatalog> Table =>
+            global::YUIFramework.Localization.LocalizationTextCatalog.Table;
+    }
+
+
+    public static class UIPresentationConfig
+    {
+        public static ConfigTable<global::YUIFramework.Localization.UIPresentationCatalog> Table =>
+            global::YUIFramework.Localization.UIPresentationCatalog.Table;
+    }
+
+
     public sealed class UISettingsRow
     {
         public string Profile { get; }
@@ -126,11 +140,15 @@ namespace YUIFramework.ConfigGenerated
     {
         public static IReadOnlyList<string> Names { get; } = Array.AsReadOnly(new[]
         {
+                "LocalizationTextConfig",
+                "UIPresentationConfig",
                 "UISettings"
         });
 
         public static IReadOnlyList<ConfigTable> Tables { get; } = Array.AsReadOnly(new ConfigTable[]
         {
+            LocalizationTextConfig.Table,
+            UIPresentationConfig.Table,
             UISettings.Table
         });
     }

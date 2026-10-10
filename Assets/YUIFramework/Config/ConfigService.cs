@@ -16,8 +16,18 @@ namespace YUIFramework.Configuration
         private Run _running;
         private long _generation;
         private UniTaskCompletionSource _shutdown;
+        private bool _notifying;
         public ConfigSnapshot Snapshot { get; private set; }
         public Exception LastFailure { get; private set; }
+        public Exception LastNotificationFailure { get; private set; }
+        public event Action SnapshotChanged;
+
+        public bool IsTableRegistered(ConfigTable table)
+        {
+            CheckThread();
+            if (table == null) throw new ArgumentNullException(nameof(table));
+            return Array.IndexOf(_tables, table) >= 0;
+        }
 
         public ConfigService(IConfigSource source, IConfigCodec codec, ConfigFormat format,
             IEnumerable<ConfigTable> tables)
@@ -37,6 +47,7 @@ namespace YUIFramework.Configuration
         public UniTask<ConfigSnapshot> InitializeAsync(CancellationToken cancellationToken = default)
         {
             CheckThread();
+            CheckNotification();
             cancellationToken.ThrowIfCancellationRequested();
             if (_shutdown != null) throw new InvalidOperationException("Config shutdown is still draining.");
             if (Snapshot != null) return UniTask.FromResult(Snapshot);
@@ -45,6 +56,7 @@ namespace YUIFramework.Configuration
         public UniTask<ConfigSnapshot> ReloadAsync(CancellationToken cancellationToken = default)
         {
             CheckThread();
+            CheckNotification();
             cancellationToken.ThrowIfCancellationRequested();
             if (_shutdown != null) throw new InvalidOperationException("Config shutdown is still draining.");
             return LoadAsync(cancellationToken);
@@ -103,6 +115,7 @@ namespace YUIFramework.Configuration
                 snapshot = new ConfigSnapshot(run.Generation, parsed, optional);
                 Snapshot = snapshot;
                 LastFailure = null;
+                failure = NotifySnapshotChanged();
             }
             catch (Exception error) { failure = error; LastFailure = error; }
             finally
@@ -115,23 +128,24 @@ namespace YUIFramework.Configuration
         public UniTask ShutdownAsync()
         {
             CheckThread();
+            CheckNotification();
             if (_shutdown != null) return _shutdown.Task;
             Snapshot = null;
             _generation++;
             var completion = new UniTaskCompletionSource();
             _shutdown = completion;
-            DrainAsync(_running, completion).Forget(UnityEngine.Debug.LogException);
+            var notificationFailure = NotifySnapshotChanged();
+            DrainAsync(_running, completion, notificationFailure).Forget(UnityEngine.Debug.LogException);
             return completion.Task;
         }
-        private async UniTask DrainAsync(Run run, UniTaskCompletionSource completion)
+        private async UniTask DrainAsync(Run run, UniTaskCompletionSource completion, Exception failure)
         {
-            Exception failure = null;
             try
             {
                 if (run != null)
                 {
                     try { run.Cancellation.Cancel(); }
-                    catch (Exception error) { failure = error; }
+                    catch (Exception error) { failure = failure == null ? error : new AggregateException(failure, error); }
                     var outcome = await run.Completion.Task;
                     if (outcome.Error != null && !(outcome.Error is OperationCanceledException))
                         failure = failure == null ? outcome.Error : new AggregateException(failure, outcome.Error);
@@ -148,6 +162,26 @@ namespace YUIFramework.Configuration
         {
             if (Thread.CurrentThread.ManagedThreadId != _thread)
                 throw new InvalidOperationException("ConfigService must be used on its Unity owning thread.");
+        }
+        private void CheckNotification()
+        {
+            if (_notifying) throw new InvalidOperationException("Config mutation during SnapshotChanged is not supported.");
+        }
+        private Exception NotifySnapshotChanged()
+        {
+            List<Exception> failures = null;
+            _notifying = true;
+            try
+            {
+                var handlers = SnapshotChanged?.GetInvocationList();
+                if (handlers != null)
+                    foreach (Action handler in handlers)
+                        try { handler(); }
+                        catch (Exception error) { (failures ??= new List<Exception>()).Add(error); }
+            }
+            finally { _notifying = false; }
+            return LastNotificationFailure = failures == null ? null :
+                new AggregateException("Config snapshot committed, but notification failed.", failures);
         }
         private sealed class Run
         {

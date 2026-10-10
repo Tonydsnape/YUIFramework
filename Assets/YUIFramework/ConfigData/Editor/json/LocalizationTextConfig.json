@@ -1,0 +1,56 @@
+{
+  "sample.greeting": {
+    "Key": "sample.greeting",
+    "zh-CN": "你好，{0}！",
+    "en": "Hello, {0}!",
+    "fr": "Bonjour, {0} !"
+  },
+  "sample.title": {
+    "Key": "sample.title",
+    "zh-CN": "文本本地化示例",
+    "en": "Text localization sample",
+    "fr": "Exemple de localisation"
+  },
+  "sample.switch": {
+    "Key": "sample.switch",
+    "zh-CN": "切换语言",
+    "en": "Switch language",
+    "fr": "Changer de langue"
+  },
+  "sample.fallback": {
+    "Key": "sample.fallback",
+    "zh-CN": "此条法语为空，将回退到英语。",
+    "en": "French is empty; this is the English fallback.",
+    "fr": null
+  },
+  "sample.theme": {
+    "Key": "sample.theme",
+    "zh-CN": "切换主题",
+    "en": "Switch theme",
+    "fr": "Changer de thème"
+  },
+  "sample.size": {
+    "Key": "sample.size",
+    "zh-CN": "调整字号",
+    "en": "Text size",
+    "fr": "Taille du texte"
+  },
+  "sample.contrast": {
+    "Key": "sample.contrast",
+    "zh-CN": "高对比度",
+    "en": "High contrast",
+    "fr": "Contraste élevé"
+  },
+  "sample.motion": {
+    "Key": "sample.motion",
+    "zh-CN": "减少动画",
+    "en": "Reduce motion",
+    "fr": "Réduire les animations"
+  },
+  "sample.close": {
+    "Key": "sample.close",
+    "zh-CN": "关闭",
+    "en": "Close",
+    "fr": "Fermer"
+  }
+}

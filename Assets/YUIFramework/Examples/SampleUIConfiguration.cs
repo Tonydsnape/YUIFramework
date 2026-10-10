@@ -73,13 +73,14 @@ namespace YUIFramework
     {
         private readonly UIResourceService _resources = null;
         public ConfigService Service { get; }
+        public IUIResourceService SampleResources => _resources;
         public SampleConfigOwner()
         {
+            _resources = new UIResourceService();
+            _resources.Packages.Register(new ResourcesResourceProvider(), true);
 #if UNITY_EDITOR
             Service = SampleUIConfiguration.Create(new EditorJsonConfigSource(), ConfigFormat.Json);
 #else
-            _resources = new UIResourceService();
-            _resources.Packages.Register(new ResourcesResourceProvider(), true);
             Service = SampleUIConfiguration.Create(
                 new ResourceConfigSource(_resources, prefix: "YUIConfig/"), ConfigFormat.MessagePack);
 #endif

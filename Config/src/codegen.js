@@ -1,4 +1,10 @@
 'use strict';
+const { validateLocalizationSchema } = require('./localization-schema');
+const { validatePresentationSchema } = require('./presentation-schema');
+const customCatalogs = new Map([
+  ['LocalizationTextConfig', 'LocalizationTextCatalog'],
+  ['UIPresentationConfig', 'UIPresentationCatalog']
+]);
 
 const CS_TYPES = {
   int: 'int',
@@ -154,6 +160,8 @@ ${config.required !== false ? '            if (rows.Count == 0) throw new Config
 }
 
 function generateCSharp(configurations, namespace = 'YUIFramework.ConfigGenerated') {
+  validateLocalizationSchema(configurations);
+  validatePresentationSchema(configurations);
   namespace = namespace.split('.').map(part => identifier(part, 'Namespace')).join('.');
   const symbols = new Set(['GeneratedConfigCatalog', 'ConfigTable', 'ConfigValue', 'ConfigKey',
     'ConfigRowNode', 'ConfigDataException', 'JObject', 'JToken', 'Array', 'Dictionary',
@@ -166,6 +174,7 @@ function generateCSharp(configurations, namespace = 'YUIFramework.ConfigGenerate
       if (symbols.has(name)) throw new Error(`Generated type collision: ${name}`);
       symbols.add(name);
     }
+    if (customCatalogs.has(config.name)) continue;
     for (const field of clientFields(config)) {
       if (infrastructure.has(field.name) || [config.name, config.name + 'Row'].includes(field.name))
         throw new Error(`Field collides with generated member: ${field.name}`);
@@ -173,7 +182,13 @@ function generateCSharp(configurations, namespace = 'YUIFramework.ConfigGenerate
         throw new Error(`Field collides with JSON backing member: ${field.name}`);
     }
   }
-  const bodies = configurations.map((config) => config.type === 'base'
+  const bodies = configurations.map((config) => customCatalogs.has(config.name) ? `
+    public static class ${config.name}
+    {
+        public static ConfigTable<global::YUIFramework.Localization.${customCatalogs.get(config.name)}> Table =>
+            global::YUIFramework.Localization.${customCatalogs.get(config.name)}.Table;
+    }
+` : config.type === 'base'
     ? generateBase(config)
     : generateNormal(config)).join('\n');
 

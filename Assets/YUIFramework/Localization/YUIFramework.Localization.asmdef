@@ -1,0 +1,5 @@
+{
+  "name": "YUIFramework.Localization",
+  "references": ["YUIFramework.Runtime", "YUIFramework.Config", "UniTask", "Unity.Newtonsoft.Json", "Unity.TextMeshPro", "Unity.ugui"],
+  "autoReferenced": true
+}

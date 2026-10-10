@@ -2,12 +2,18 @@
 
 Y2.0 uses one development line and advances through strict stage gates. Only one stage is implemented at a time. Code, tests, documentation, and acceptance must be complete before the next stage begins.
 
-**Progress: stages 0-10 complete (11 of 17 stages). Stage 11 has not started.**
+**Progress: stages 0-11 complete (12 of 17 stages). Stage 12 has not started.**
 
 Independent post-stage-10 work: **Config integration complete**. This connects the
 Excel toolchain, atomic typed snapshots and existing UI registrations; it does not
-renumber the roadmap or begin stage 11. Acceptance: Node 17/17, installed-vendor
+renumber the roadmap. Acceptance: Node 17/17, installed-vendor
 EditMode 175/175 and PlayMode 153/153, no-vendor 175/175 and 138/138; see Testing.md.
+
+Stage 11 incorporates the accepted text-localization subitem, unified scaling/safe
+content, transient device previews, licensed WenKai TMP glyphs/fallback, localized
+font/sprite/material resources, typed themes and accessibility/formatting extensions.
+Node 31/31; full installed-vendor 195 Edit / 170 Play; no-vendor 195 Edit / 155 Play.
+See [Localization.md](Localization.md), [Presentation.md](Presentation.md) and Testing.md.
 
 ## Fixed decisions
 
@@ -35,8 +41,8 @@ EditMode 175/175 and PlayMode 153/153, no-vendor 175/175 and 138/138; see Testin
 | 8 (complete) | Interruptible transitions and visibility | Show/hide can be canceled or reversed without stale writes, transform, alpha, input, or navigation residue |
 | 9 (complete) | Messaging and MVVM lifecycle | Typed messages, scoped subscriptions, commands, common bindings, cancellation, and pooling are safe |
 | 10 (complete) | Commercial virtual list | Licensed SuperScrollView List/Grid, dynamic List sizes, stable-ID changes/anchors, async leases, nested drag, and 10,000-row/no-vendor gates pass; see Virtualization.md and Testing.md |
-| 11 | Mobile adaptation, localization, and themes | Safe area, aspect ratios, runtime language/theme refresh, fonts, and missing-content checks work |
-| 12 | Scene and system UI services | UI scopes, scene cleanup, reference-counted loading, Toast throttling, and Dialog results are stable |
+| 11 (complete) | Mobile adaptation, localization, and themes | Six device geometries, live language/theme/accessibility, real WenKai glyph/raster/bounded fallback, async leases and transient Editor checks verified |
+| 12 (not started) | Scene and system UI services | UI scopes, scene cleanup, reference-counted loading, Toast throttling, and Dialog results are stable |
 | 13 | Diagnostics and performance budgets | Runtime state, ownership, operations, leaks, timings, and uGUI cost can be inspected |
 | 14 | Editor tooling and build gates | Generation, prefab/resource/performance checks, previews, and YooAsset reports block invalid builds |
 | 15 | HybridCLR boundary validation | AOT/Hotfix sample boundaries, generic risks, stripping rules, and the DLL-loading extension point are proven |

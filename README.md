@@ -11,7 +11,7 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 
 ## Y2.0 改造基线
 
-Y2.0 正在按阶段建立商用基线。阶段 0 到阶段 6 已完成：除阶段 0-5 的 UI 生命周期、并发、输入和资源所有权外，现已提供不可变 Bootstrap Profile、集中状态图、三运行模式、弱网重试/超时、主备 CDN、验证回退、磁盘/确认门禁、结构化进度与实例化 Reset/Shutdown。
+Y2.0 正在按阶段建立商用基线。阶段 0 到阶段 11 已完成，阶段 12 未开始：包含资源 Bootstrap、池治理、可取消转场、消息/MVVM、商业虚拟列表、Excel 配置，以及安全区、文本/图片/字体本地化、主题和可访问性基础。中文基础字体实际使用 OFL 授权的霞鹜文楷 Regular。
 
 - 基线说明：[`Documentation/Y2.0/Baseline.md`](Documentation/Y2.0/Baseline.md)
 - 分阶段路线：[`Documentation/Y2.0/Roadmap.md`](Documentation/Y2.0/Roadmap.md)
@@ -20,6 +20,8 @@ Y2.0 正在按阶段建立商用基线。阶段 0 到阶段 6 已完成：除阶
 - 资源所有权体系：[`Documentation/Y2.0/Resources.md`](Documentation/Y2.0/Resources.md)
 - 资源 Bootstrap：[`Documentation/Y2.0/Bootstrap.md`](Documentation/Y2.0/Bootstrap.md)
 - Excel 配置与现有 UI 注册迁移：[`Documentation/Y2.0/Config.md`](Documentation/Y2.0/Config.md)
+- 配置表文本多语言与组件 key 选择：[`Documentation/Y2.0/Localization.md`](Documentation/Y2.0/Localization.md)
+- 阶段 11 屏幕适配、霞鹜文楷、主题与可访问性：[`Documentation/Y2.0/Presentation.md`](Documentation/Y2.0/Presentation.md)
 - Bootstrap 迁移：[`Documentation/Y2.0/Migration.md`](Documentation/Y2.0/Migration.md)
 - 测试说明：[`Documentation/Y2.0/Testing.md`](Documentation/Y2.0/Testing.md)
 - 变更记录：[`CHANGELOG.md`](CHANGELOG.md)

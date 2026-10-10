@@ -6,6 +6,19 @@ All notable changes to YUIFramework are documented in this file.
 
 ### Added
 
+- Stage 11 localization: original zh-CN/en/fr Excel sample, transactional
+  export and shared immutable typed catalog, instance key lookup with explicit
+  fallback/error results, event-driven Text/TMP component and searchable Inspector
+  key picker with multi-object Undo. No Localization/Addressables package added.
+- Config snapshot notifications and localized existing Hello/verified Bootstrap
+  startup, preserving all six UISettings rows and display/pool/navigation ownership.
+  Adds typed theme color/font/sprite/material tokens, generation-fenced resource
+  bindings, root scaling/safe-content/Editor device preview, font scaling/high
+  contrast/reduced-motion/focus semantics and formatter/RTL extension points.
+- Official OFL-licensed LXGW WenKai Regular v1.522, persisted TMP font/fallback
+  assets and required licensed TMP resources. Real multilingual glyph/mesh/raster,
+  bounded atlas, content checks and runtime presentation sample.
+
 - Independent post-stage-10 Config integration: validated Excel base/normal protocol,
   JSON/MessagePack and typed C# generation with multi-directory rollback, instance-scoped
   atomic ConfigService snapshots, cancellation/reload/lease ownership and explicit UI batches.

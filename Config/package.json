@@ -5,6 +5,7 @@
   "description": "YUIFramework Excel configuration pipeline",
   "scripts": {
     "sample": "node tools/create-ui-workbook.js",
+    "sample:localization": "node tools/create-localization-workbook.js",
     "export:client": "node src/cli.js --target client",
     "export:server": "node src/cli.js --target server",
     "validate": "node src/cli.js --validate",

@@ -7,8 +7,15 @@ Stage 2 gives every `BaseContext` one explicit state machine and at most one act
 The independent [Config startup](Config.md) precedes UI registration and does not add
 Context states. New UI batch configuration cannot replace active/pooled registrations.
 Config reload publishes data snapshots only; owners must explicitly shut down/reinitialize
-UI before applying a new registry. Teardown remains UI -> Config -> resource service ->
-Bootstrap; Config does not own injected resources.
+UI before applying a new registry. With [text localization](Localization.md),
+teardown is UI -> localization Dispose -> Config -> resource service -> Bootstrap;
+Config does not own injected resources. Localized text instead refreshes from successful
+Config publication without changing Context identity. Its component follows DisplayToken,
+detaches while disabled, defers while suspended, and rebinds on the next display.
+Stage-11 [presentation bindings](Presentation.md) follow the same token, cancel
+pending font/sprite/material work, restore baselines before releasing leases, and
+fence late completion with binding generations. Canceled close rollback retains
+the active binding. Dispose presentation after UI and before text/Config/resources.
 
 ```mermaid
 stateDiagram-v2

@@ -4,6 +4,7 @@
   "references": [
     "YUIFramework.Runtime",
     "YUIFramework.Config",
+    "YUIFramework.Localization",
     "YUIFramework.Examples",
     "Unity.Newtonsoft.Json",
     "UniTask",

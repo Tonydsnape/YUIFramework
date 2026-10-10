@@ -3,6 +3,14 @@
 Stage 5 replaces the ad-hoc `IResourceLoader` ownership rules with an explicit, testable
 resource ownership model. YooAsset 3.x is the only production backend.
 
+Stage-11 [localized presentation](Presentation.md) uses these same leases for
+font/sprite/material tokens. Each display binding owns its acquired bag; failed or
+superseded requests release partial/late leases, and visuals restore before old
+leases are released. TMP Settings intentionally keeps the sample WenKai baseline
+application-resident; zero display leases is not a claim that this globally
+referenced font has been unloaded. Production package addresses and dependency
+collection are explicit in Presentation.md.
+
 ## Decisions
 
 - **YooAsset 3.x is the only production resource backend.**
@@ -39,6 +47,11 @@ does not shut down its borrowed resource service. `UIConfig.PrefabPackage` now p
 to both instance prewarm and normal open; null preserves the existing default-package
 behavior. The production startup order remains verified Bootstrap resources, Config,
 typed UI batch registration, then business entry.
+
+The [text-localization table](Localization.md) uses the same TextAsset lease path,
+at YooAsset address `LocalizationTextConfig` beside `UISettings` in the configured
+package. Lookup/locale changes read the immutable snapshot and never acquire
+another asset lease. This does not implement localized sprite/font loading.
 
 1. **Single-flight.** Concurrent loads of the same key trigger exactly one native load.
    Every caller receives its own independent lease over the same underlying asset.

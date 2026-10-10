@@ -1,5 +1,116 @@
 # Y2.0 Testing Baseline
 
+## Complete stage 11 acceptance
+
+Unity 2022.3.62f2, Windows Editor/Mono, Direct3D11 (Intel UHD Graphics 770),
+2026-10-10. Node 24.15.0: **31/31**, validation **3 tables**.
+All times below are fresh XML `test-run` UTC attributes, not command timestamps.
+
+| Gate | Passed | UTC interval | XML |
+|---|---:|---|---|
+| Directed text/presentation/Inspector, Edit | 20/20 | 09:06:04-09:06:04 | `stage11-acceptance-directed2-editmode.xml` |
+| Directed controls/render/lifecycle, Play | 17/17 | 09:06:15-09:06:18 | `stage11-acceptance-directed2-playmode.xml` |
+| Full installed-vendor, Edit | 195/195 | 09:07:06-09:07:10 | `stage11-acceptance-final-editmode.xml` |
+| Full installed-vendor, Play | 170/170 | 09:07:23-09:07:45 | `stage11-acceptance-final-playmode.xml` |
+| Full no-vendor, Edit | 195/195 | 09:08:00-09:08:04 | `stage11-acceptance-no-vendor-final-editmode.xml` |
+| Full no-vendor, Play | 155/155 | 09:08:15-09:08:34 | `stage11-acceptance-no-vendor-final-playmode.xml` |
+
+Evidence root:
+`C:\Users\21093\.copilot\session-state\7310900a-0fd1-4a43-bd14-c674e24903bf\files`.
+Matching `.log` files, `stage11-acceptance-node-final.log` and
+`stage11-acceptance-evidence.json` are retained there.
+Copies are `stage11-validation-project` (**630** Assets/Packages/ProjectSettings
+files) and `stage11-no-vendor-project` (**562**, omitting only local commercial
+integration and its meta). Each has `{project-name}-source-sha256.json`,
+`-copy-sha256.json`, `-comparison.json`, verified after the final runs with
+**zero missing/mismatch/extra**. Earlier Config/text copies and all failed/interim
+logs remain evidence, not acceptance results.
+
+Final logs have **zero C# warning/error, Unobserved and NullReference diagnostics**.
+They intentionally contain missing-U+0378, injected material-load failure,
+localization fallback/missing-key/format and legacy duplicate-EventSystem negative
+test diagnostics. No warning global suppression or removed regression assertions
+were used.
+
+Real WenKai evidence: `stage11-validation-project\stage11-wenkai-raster.png`.
+The actual TMP font renders Chinese/Latin/French, 38 visible glyphs, 152 vertices,
+11,383 nonblack ink pixels; primary has 160 prewarmed characters and one 2048-square
+Alpha8 atlas. A transient clone of the configured dynamic fallback adds 300 CJK
+characters in one 2048-square atlas (4,194,304 texture bytes maximum). The clone
+prevents test growth from modifying the source font. This is not full Unicode,
+device rendering/60 FPS, mobile/IL2CPP or whole-UI zero-GC evidence.
+
+Protected gates retained their original measurement scope:
+typed publish **0 bytes / 10,000**; real Slider/Toggle paired updates **0 bytes /
+10,000**; vendor ScrollTo **0 bytes / 100**, native instances 29 -> 29;
+continuous vendor content scroll **0 bytes / 200**, 29 created.
+Player-loop/test-runner/deferred uGUI layout and string formatting are excluded
+where originally documented. The new presentation layer makes no zero-GC claim.
+
+Stage11 regressions cover six device geometries and 18 ratio/font-scale combinations,
+scrollable focus, scaler/safe-area restoration, parent geometry changes, typed
+tokens, direct/caller cancellation, partial/late assets, material rendering,
+close rollback/failed show/Shutdown, 1,000 disable cycles and read-only Editor
+font isolation. Read-only review fixes: TMP materials must use fontSharedMaterial;
+safe content must refresh after nested parent changes; transient previews must
+clone shared font/atlas dependencies. Directed investigation also fixed concurrent
+awaits of refresh results, completed TMP punctuation resources and prewarmed common
+currency/control glyphs so final full-copy hashes stay unchanged.
+
+## Stage 11 text-only localization verification
+
+Historical checkpoint before the complete-stage font/presentation work above.
+
+Unity 2022.3.62f2, 2026-10-10. Node 24.15.0: **29/29** plus validation of both
+workbooks. All intervals are actual XML `test-run` UTC attributes.
+
+| Gate | Passed | UTC interval | XML |
+|---|---:|---|---|
+| Directed localization / Inspector, Edit | 14/14 | 04:46:44-04:46:44 | `localization-acceptance-directed-editmode.xml` |
+| Directed real controls / lifecycle, Play | 6/6 | 04:46:59-04:47:02 | `localization-acceptance-directed-playmode.xml` |
+| Full, installed SuperScrollView, Edit | 189/189 | 04:47:29-04:47:32 | `localization-acceptance-final-editmode.xml` |
+| Full, installed SuperScrollView, Play | 159/159 | 04:47:46-04:48:08 | `localization-acceptance-final-playmode.xml` |
+| Full, no vendor, Edit | 189/189 | 04:50:12-04:50:16 | `localization-acceptance-no-vendor-final-editmode.xml` |
+| Full, no vendor, Play | 144/144 | 04:50:30-04:50:49 | `localization-acceptance-no-vendor-final-playmode.xml` |
+
+Evidence root:
+`C:\Users\21093\.copilot\session-state\7310900a-0fd1-4a43-bd14-c674e24903bf\files`.
+Matching `.log` files, `localization-acceptance-node.log` and
+`localization-acceptance-evidence.json` are retained there.
+Validation roots directly under it are `localization-validation-project` (557
+Assets/Packages/ProjectSettings files including installed vendor) and
+`localization-no-vendor-project` (489 files). Each has `{project-name}-source-sha256.json`,
+`-copy-sha256.json` and `-comparison.json`: zero missing/mismatch/extra at verification.
+The earlier Config validation copies remain untouched. The unchanged UISettings JSON
+and bytes additionally match their earlier Config-acceptance SHA256 manifest.
+`localization-source-reference-sha256.json` records hashes of seven read-only source
+references at delivery, not a retroactive before/after source baseline.
+
+All six gates have zero failed/skipped/inconclusive results; logs have zero C#
+warning/error, Unobserved and NullReference diagnostics. They are **not warning-free**:
+active TMP tests temporarily inject/restore isolated TMP settings because this repo
+has no Essential font assets, and report missing-font warnings. They exercise actual
+TextMeshProUGUI lifecycle and string updates, not glyph rendering. Tests also
+deliberately log fallback/missing-key/invalid-format diagnostics and the pre-existing
+duplicate EventSystem regression. No interactive Unity editor was terminated.
+
+Regressions cover Unicode JSON/MessagePack equivalence, strict schema/key/locale/format
+failure before export/publication, fallback versus exact API results, before-ready
+binding, Config reload/shutdown/reinit, cancellation and late noncooperative results,
+read-only entries, picker multi-edit/Undo, real Text/TMP enable/disable/destroy/rebind,
+1,000 real display/pool cycles with subscriber count returning to zero, navigation
+coverage/resume, canceled-close rollback, failed show cleanup, and actual migrated
+startup/language-button behavior. Existing Config, MVVM and commercial-list suites
+remain included.
+
+Focused read-only review found and regressed: nested Config notification incorrectly
+clearing the outer language mutation guard; repeated already-open sample shows
+accumulating language listeners/retaining a previous text binding; and export accepting
+locale names not recognized by Unity. The fixes restore the outer guard, replace the
+sample binding group, and enforce the same bounded locale allowlist in export/runtime.
+No localized font/sprite, safe-area/theme, IL2CPP/mobile/CDN, glyph-rendering, FPS or
+localization zero-allocation claim is made.
+
 ## Independent Config integration acceptance
 
 Unity 2022.3.62f2, 2026-10-09. Exact intervals below are from the XML `test-run`

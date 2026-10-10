@@ -4,6 +4,10 @@
   "references": [
     "YUIFramework.Runtime",
     "YUIFramework.Config",
+    "YUIFramework.Localization",
+    "YUIFramework.Localization.Editor",
+    "Unity.TextMeshPro",
+    "Unity.ugui",
     "YUIFramework.Config.Editor",
     "YUIFramework.Examples",
     "Unity.Newtonsoft.Json",

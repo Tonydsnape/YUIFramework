@@ -1,0 +1,6 @@
+{
+  "name": "YUIFramework.Localization.Editor",
+  "references": ["YUIFramework.Localization", "YUIFramework.Config", "YUIFramework.Runtime", "Unity.Newtonsoft.Json", "Unity.TextMeshPro", "Unity.ugui"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}

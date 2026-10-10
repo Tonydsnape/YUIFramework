@@ -6,6 +6,7 @@ using UnityEngine;
 using YUIFramework.Bootstrap;
 using YUIFramework.Bootstrap.YooAsset;
 using YUIFramework.Configuration;
+using YUIFramework.Localization;
 
 namespace YUIFramework
 {
@@ -25,6 +26,8 @@ namespace YUIFramework
         private YooAssetBootstrapComposition _composition;
         private UIManager _uiService;
         private ConfigService _configs;
+        private TextLocalizationService _localization;
+        private UIPresentationService _presentation;
         private UniTask _runTask;
 
         private void Start()
@@ -69,10 +72,13 @@ namespace YUIFramework
                 _configs = SampleUIConfiguration.Create(
                 new ResourceConfigSource(_composition.ResourceService, packageName),
                 ConfigFormat.MessagePack);
+            _localization = new TextLocalizationService(_configs, "en");
+            _presentation = new UIPresentationService(_configs, _localization, _composition.ResourceService,
+                _uiService.Transitions, defaultPackage: packageName);
             await ConfigUIStartup.EnterAsync(_configs, _uiService,
                 snapshot => SampleUIConfiguration.Map(snapshot, "bootstrap"),
                 async token => { await _uiService.Navigator.PushAsync<SampleHelloPage>(
-                    "Hello YUIFramework Bootstrap!", cancellationToken: token); }, cancellationToken);
+                    new SampleLocalizedHelloArgs(_localization, "YUIFramework Bootstrap", _presentation), cancellationToken: token); }, cancellationToken);
         }
 
         private BootstrapProfile CreateProfile()
@@ -112,6 +118,17 @@ namespace YUIFramework
                 }
             }
 
+            if (_presentation != null)
+            {
+                try { _presentation.Dispose(); } catch (Exception exception) { failures.Add(exception); }
+                _presentation = null;
+            }
+            if (_localization != null)
+            {
+                try { _localization.Dispose(); }
+                catch (Exception exception) { failures.Add(exception); }
+                _localization = null;
+            }
             if (_configs != null)
             {
                 try { await _configs.ShutdownAsync(); }

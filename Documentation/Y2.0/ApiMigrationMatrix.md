@@ -7,6 +7,11 @@ This matrix records intent before implementation. Final Y2 names may be refined 
 | `UIManager.Instance` | Injected `IUIService` | Temporary facade; Y2 service available |
 | `UIManager.Init` | `Initialize` / `InitializeAsync` / `ShutdownAsync` | Obsolete forwarding overload implemented |
 | `Register<T>(UIConfig)` | Excel `UISettings` + explicit `UIConfigRegistration.For<T>` + `UIManager.RegisterBatch` | Manual mutable registration remains compatible; new batch inputs are validated copies |
+| Hardcoded text / source static localization utility | Excel `LocalizationTextConfig` + instance `TextLocalizationService` | `Get/TryGet` are strict; `Resolve` exposes explicit fallback/error status |
+| Source Unity Localization string/sprite event | `ConfigLocalizedText` key picker + `ConfigPresentationBinding` typed font/sprite tokens | Original instance DI; no Addressables or source-game singleton |
+| Per-page hardcoded scaler/safe insets | `UIRootRuntimeOptions.ScalePolicy` + `UISafeAreaContent` | Content only; blockers/backgrounds remain fullscreen |
+| Ad-hoc theme/font changes | `UIPresentationService` + immutable `UIPresentationCatalog` | Explicit resource leases; baseline restoration and no cumulative scaling |
+| Custom accessibility animation writer | `UIAccessibilityOptions` + existing `UITransitionRunner.SetReducedMotion` | No second tween/state engine; focused semantics/formatter/RTL extension points |
 | `OpenAsync<T>(object)` | UniTask/cancellation now; typed request later | `OpenHandleAsync<T>` added, object arguments retained |
 | `CloseAsync<T>()` | UniTask/cancellation and owning-service handle | Existing overload retained |
 | `UINavigator` | `IUINavigator`; command queue and transactions next | Interface and cancellation implemented; stage 3 adds FIFO queue, `IsBusy`, `BringToTopAsync<T>`, `NavigateBackAsync`, guards, and transaction rollback |
