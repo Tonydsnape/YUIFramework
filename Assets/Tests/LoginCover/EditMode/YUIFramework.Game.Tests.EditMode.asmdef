@@ -1,0 +1,7 @@
+{
+  "name": "YUIFramework.Game.Tests.EditMode",
+  "references": ["YUIFramework.Game", "YUIFramework.Game.Editor", "YUIFramework.Runtime", "Unity.ugui", "Unity.TextMeshPro"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": false,
+  "optionalUnityReferences": ["TestAssemblies"]
+}

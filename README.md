@@ -115,6 +115,49 @@ P7 生命周期语义：
 
 ## 快速开始
 
+### 游戏横屏封面
+
+游戏入口场景是 `Assets\Scenes\LoadScene.unity`，也是 Build Settings 中首个启用场景，
+其中 `_App` 挂载 `GameBootstrap`，由它创建并拥有唯一的 UIRoot/EventSystem；
+场景不再保留额外的空 Canvas/EventSystem。封面使用独立 `UIManager` 实例和现有 Navigator：
+`LoginCoverPageContext -> Replace -> MainMenuPageContext`，返回不会再次打开封面。
+主菜单现有开始/设置行为仍是示例日志，不包含账号认证或真正的游戏场景。
+
+封面预制体位于 `Assets\Resources\UI\Pages\LoginCoverPage.prefab`，已引用
+`Assets\GameRes\UI\Sprite\Load` 中的 `Background_01`（2000×1125）和
+`Btn_IconButton_Circle_359`（359×359），保留素材原有 GUID，按 Sprite (2D and UI)
+导入、关闭 Mipmap，不对非二次幂图片重采样。直接运行上述入口场景即可；
+原 `New Scene` 已移除，启动与构建均使用 `LoadScene`。
+
+如需重新创建缺失的封面，执行 **Tools > YUIFramework > Game > Create missing login cover**。
+工具也支持同名图集子 Sprite；缺失或重名会明确报错，不生成占位图、不覆盖已有封面。
+修改已生成页面可直接使用 Prefab 编辑器，保留 `LoginCoverView` 的序列化引用。
+该游戏入口沿用 Resources 最小兼容路径，商业发行仍需确认素材授权，并按照项目
+生产后端文档接入 YooAsset、打包和真机验收。
+
+UI 参考分辨率为 **1920×1080（16:9）**，常见同宽高比输出还有 1280×720 和
+2560×1440。这是设计坐标，不强制设备以固定分辨率运行。该入口独立使用
+CanvasScaler 的 **Expand**：较宽时按高度缩放，较窄时按宽度缩放，额外空间扩展；
+框架默认缩放策略不变。移动端只允许左右横屏旋转，桌面窗口仍可调整尺寸。
+
+背景按实际 Sprite 比例居中等比铺满：比图片更宽的屏幕裁上下，比图片更窄的
+屏幕裁左右，不拉伸、不补黑边。背景不受安全区缩进。开始按钮单独放在安全区内，
+默认水平居中、中心位于距安全区底边 18% 的高度，图片等比显示，256×256 设计
+单位的热区大于可见图标，焦点有独立边框提示。按钮中心的“开始”标签使用现有
+WenKai TMP 字体，文本及布局保存在预制体内且不拦截射线。支持现有 EventSystem 的
+鼠标、触控和键盘/手柄 Submit 映射；进入期间禁用连点，失败保留封面、记录异常并允许重试，
+页面仍可交互时恢复默认焦点，不抢占上层弹窗。
+
+在 Unity Test Runner 运行 `LoginCoverAssetTests`（EditMode）、
+`LoginCoverPlayModeTests` 和 `LoginCoverStartupPlayModeTests`（PlayMode）。
+回归同时使用临时 Sprite 和实际封面资源，检查资源依赖、10 种窗口尺寸、
+不对称安全区的真实 RectTransform 几何、输入焦点、替换导航、失败重试及加载中取消清理。
+启动场景测试通过 EventSystem 射线验证按钮中心及图标外的透明热区可点击，
+再进入现有主菜单。编辑器 Game View 已检查 1920×1080、2400×1080、1440×1080、
+3440×1440 的实际美术裁切；这不代表移动端真机、平台包或帧率验收。
+
+### 框架示例
+
 1. 在 `Config` 目录执行 `npm.cmd ci --ignore-scripts`、`npm.cmd run export:client`。
 2. 在场景中创建空物体，挂载 `HelloUIBootstrap`。
 3. 运行后先加载生成的配置表，再按显式 Context 映射批量注册并打开页面。

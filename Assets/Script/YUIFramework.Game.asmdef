@@ -1,0 +1,5 @@
+{
+  "name": "YUIFramework.Game",
+  "references": ["YUIFramework.Runtime", "UniTask", "Unity.ugui", "Unity.TextMeshPro"],
+  "autoReferenced": true
+}

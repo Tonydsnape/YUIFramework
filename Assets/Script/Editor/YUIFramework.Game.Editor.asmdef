@@ -1,0 +1,6 @@
+{
+  "name": "YUIFramework.Game.Editor",
+  "references": ["YUIFramework.Game", "YUIFramework.Runtime", "Unity.ugui", "Unity.TextMeshPro"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}
