@@ -7,6 +7,7 @@ namespace YUIFramework
         private readonly UIConfig _config;
         private UIConfigRegistration(Type type, UIConfig config)
         {
+            ValidateContextType(type);
             ContextType = type;
             _config = (config ?? throw new ArgumentNullException(nameof(config))).Copy();
             Validate(_config);
@@ -15,6 +16,13 @@ namespace YUIFramework
         internal UIConfig CreateSnapshot() => _config.Copy();
         public static UIConfigRegistration For<T>(UIConfig config) where T : BaseContext =>
             new UIConfigRegistration(typeof(T), config);
+
+        public static void ValidateContextType(Type type)
+        {
+            if (type == null || !type.IsClass || type.IsAbstract || type.ContainsGenericParameters ||
+                !typeof(BaseContext).IsAssignableFrom(type) || type.GetConstructor(Type.EmptyTypes) == null)
+                throw new ArgumentException("Context must be a concrete BaseContext class with a public parameterless constructor.", nameof(type));
+        }
 
         public static void Validate(UIConfig config)
         {

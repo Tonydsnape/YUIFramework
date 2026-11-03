@@ -11,7 +11,7 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 
 ## Y2.0 改造基线
 
-Y2.0 正在按阶段建立商用基线。阶段 0 到阶段 11 已完成，阶段 12 未开始：包含资源 Bootstrap、池治理、可取消转场、消息/MVVM、商业虚拟列表、Excel 配置，以及安全区、文本/图片/字体本地化、主题和可访问性基础。中文基础字体实际使用 OFL 授权的霞鹜文楷 Regular。
+Y2.0 正在按阶段建立商用基线。阶段 0 到阶段 15 已完成，阶段 16 未开始：包含资源 Bootstrap、池治理、可取消转场、消息/MVVM、商业虚拟列表、Excel 配置、安全区、本地化与主题、场景与系统 UI、运行时诊断与目标设备性能预算、Editor 页面生成/预览/构建门禁，以及独立 Hotfix.Sample 与 AOT 代码加载边界。阶段 15 已实际执行 Android ARM64 IL2CPP High 裁剪构建及产物检查，另以真正裁剪后的 Mono Player 验证反射入口；未安装 HybridCLR、未发布热更 DLL、未声称真机热更通过。中文基础字体实际使用 OFL 授权的霞鹜文楷 Regular。
 
 - 基线说明：[`Documentation/Y2.0/Baseline.md`](Documentation/Y2.0/Baseline.md)
 - 分阶段路线：[`Documentation/Y2.0/Roadmap.md`](Documentation/Y2.0/Roadmap.md)
@@ -22,6 +22,10 @@ Y2.0 正在按阶段建立商用基线。阶段 0 到阶段 11 已完成，阶�
 - Excel 配置与现有 UI 注册迁移：[`Documentation/Y2.0/Config.md`](Documentation/Y2.0/Config.md)
 - 配置表文本多语言与组件 key 选择：[`Documentation/Y2.0/Localization.md`](Documentation/Y2.0/Localization.md)
 - 阶段 11 屏幕适配、霞鹜文楷、主题与可访问性：[`Documentation/Y2.0/Presentation.md`](Documentation/Y2.0/Presentation.md)
+- 阶段 12 场景协作、引用计数 Loading、有限 Toast 与系统弹窗：[`Documentation/Y2.0/SystemUI.md`](Documentation/Y2.0/SystemUI.md)
+- 阶段 13 诊断面板、所有权与关联操作、真实 ProfilerRecorder 和性能预算：[`Documentation/Y2.0/Diagnostics.md`](Documentation/Y2.0/Diagnostics.md)
+- 阶段 14 页面生成、Prefab/资源检查、语言主题预览、构建门禁与 YooAsset 报告：[`Documentation/Y2.0/EditorTooling.md`](Documentation/Y2.0/EditorTooling.md)
+- 阶段 15 AOT/Hotfix 边界、泛型与裁剪、代码加载接口及可运行示例：[`Documentation/Y2.0/HybridCLRBoundary.md`](Documentation/Y2.0/HybridCLRBoundary.md)
 - Bootstrap 迁移：[`Documentation/Y2.0/Migration.md`](Documentation/Y2.0/Migration.md)
 - 测试说明：[`Documentation/Y2.0/Testing.md`](Documentation/Y2.0/Testing.md)
 - 变更记录：[`CHANGELOG.md`](CHANGELOG.md)
@@ -48,6 +52,7 @@ Y2.0 正在按阶段建立商用基线。阶段 0 到阶段 11 已完成，阶�
 - 核心调度器（`UIManager`）
 - Page 栈导航（`Push / Pop / Replace / Back`）
 - UI 缓存池（`CacheOnClose` + `MaxPoolSize`）
+- Global/Scene/Module UI 生命周期 Scope、统一场景输入仲裁与可运行 `SystemUISample`
 - 可选商业虚拟列表（SuperScrollView 2.5.3，纵横列表、动态尺寸与固定 Grid；需本地合法安装）
 - 轻量转场动画（Fade / Scale / Slide）
 - 轻量 MVVM（`ObservableProperty` + `UIDataBinding`）
@@ -134,6 +139,11 @@ P7 生命周期语义：
 修改已生成页面可直接使用 Prefab 编辑器，保留 `LoginCoverView` 的序列化引用。
 该游戏入口沿用 Resources 最小兼容路径，商业发行仍需确认素材授权，并按照项目
 生产后端文档接入 YooAsset、打包和真机验收。
+
+阶段 14 起，Player 构建必须显式选择 `UIBuildProfile`。现有封面/Resources
+示例使用菜单 **Tools > YUIFramework > Create audited minimal-demo profile**
+声明最小兼容边界；这不代表 Production 通过。生产模式会阻止非法 Resources
+或缺失地址，支持导出隔离工作区后重新验证，不会自动搬走或改写当前登录封面。
 
 UI 参考分辨率为 **1920×1080（16:9）**，常见同宽高比输出还有 1280×720 和
 2560×1440。这是设计坐标，不强制设备以固定分辨率运行。该入口独立使用
@@ -517,4 +527,4 @@ static 配置。`Examples/HotUpdateStartupSample.cs` 因保留旧 MonoScript 引
 
 ---
 
-当前仓库已落地 P1 ~ P9；Y2.0 阶段 6 已完成，阶段 7 尚未开始。
+当前仓库已落地 P1 ~ P9；Y2.0 阶段 0 ~ 12 已完成，阶段 13 尚未开始。

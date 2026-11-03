@@ -50,6 +50,7 @@ namespace YUIFramework
                 InputLocks = new UIInputLockService(LayerProfile, Interaction);
                 Modals = new UIModalService(Root, LayerManager, Interaction);
                 Interaction.Bind(InputLocks, Modals);
+                InputArbiter = new UIInputArbiter(this);
                 Input = new UIInputRouter();
                 _inputDriver = Root.gameObject.AddComponent<UIInputDriver>();
                 _inputDriver.Bind(Input, EventSystem);
@@ -73,6 +74,7 @@ namespace YUIFramework
         public UIFocusService Focus { get; }
         public UIModalService Modals { get; }
         public UIInputRouter Input { get; }
+        public UIInputArbiter InputArbiter { get; }
         public UIScreenLayout ScreenLayout { get; }
         public bool IsDisposed => _disposed;
 
@@ -177,7 +179,7 @@ namespace YUIFramework
         public void BindNavigator(IUINavigator navigator)
         {
             ThrowIfDisposed();
-            Input.Bind(navigator, InputLocks);
+            Input.Bind(navigator, InputLocks, modals: Modals);
         }
 
         public void Dispose()

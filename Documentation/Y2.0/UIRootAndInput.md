@@ -6,6 +6,12 @@ sorting leases, modal interaction, input locks, focus, and back input.
 
 ## Root and EventSystem ownership
 
+The stage-13 optional diagnostics panel uses this same root, Debug layer, modal
+stack, Back handler and focus restoration. It creates no EventSystem, input-lock
+singleton or competing CanvasGroup animation writer. Tree counts are manual,
+opt-in diagnostic snapshots; normal input is not scanned each frame by the
+diagnostic service. See [Diagnostics.md](Diagnostics.md).
+
 Use one of two construction paths:
 
 ```csharp
@@ -96,13 +102,23 @@ result. Releasing leases out of order is safe; the last release restores profile
 interaction. Shutdown records `UIManager.LastShutdownInputLockLeakCount` and forcibly
 clears remaining leases.
 
+Stage 12 exposes `IUIService.InputArbiter` over this same runtime. Scene controllers
+consult IsSceneInputAllowed/CanProcessScenePointer/CanProcessSceneKeyboard for
+modal/fullscreen/lock and EventSystem pointer/selection arbitration. Its Acquire
+forwards to these existing leases, not another input lock store. The arbiter
+does not disable EventSystem or alter the interaction controller's sole-writer
+contract. See [SystemUI.md](SystemUI.md).
+
 ## Back input and focus
 
 `UIInputRouter` uses an `IUIBackInputSource`; the default legacy source maps Unity
 `KeyCode.Escape` to desktop Escape and Android Back without depending on the new Input
-System. Pointer and touch dispatch remain with uGUI `EventSystem`. Requests route only to
-`IUINavigator.NavigateBackAsync`, are rejected while navigation is busy, input is locked,
-or another back request is in flight, and clear their in-flight state in `finally`.
+System. Pointer and touch dispatch remain with uGUI `EventSystem`. Input locks or
+an in-flight Back reject new requests. Stage 12 routes first to the top modal's
+`IUIBackHandler`; an unhandled/non-declinable modal blocks background page navigation.
+The standard confirmation maps Back to Declined when cancellation is allowed.
+With no modal, requests route to `IUINavigator.NavigateBackAsync`, rejecting busy
+navigation and clearing their in-flight state in `finally`.
 The early input driver suppresses EventSystem navigation for that frame, preventing the
 legacy `Cancel` mapping from dispatching a second Escape action while pointer/touch
 processing remains enabled.
@@ -115,8 +131,9 @@ always move focus to the top modal.
 
 ## Shutdown boundary
 
-Stage 3 ordering is preserved: stop new navigation work, cancel service lifetime, drain the
-navigator, stop and drain per-type lanes, then close active contexts and clear pools.
+Stage 12 rejects new public work, cancels service lifetime, cancels/drains UI
+lifetime scopes while internal cleanup lanes remain open, then drains the navigator
+and per-type lanes before closing remaining contexts and clearing pools.
 Only after those steps does stage 4 clear interaction, focus, input locks, layers, and the
 root runtime. Concurrent shutdown callers share one completion task and cannot interleave
-cleanup. Stage 5 resource leases are not implemented here.
+cleanup. Resource leases retain their stage 5 ownership contract.

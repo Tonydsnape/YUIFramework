@@ -19,6 +19,16 @@ namespace YUIFramework
         private bool _disposed;
         public bool ReducedMotion { get; private set; }
         public bool IsDisposed => _disposed;
+        public IReadOnlyList<UITransitionDiagnosticSnapshot> GetDiagnostics()
+        {
+            var snapshots = new List<UITransitionDiagnosticSnapshot>();
+            foreach (var state in _targets.Values)
+                if (state.Active != null)
+                    snapshots.Add(new UITransitionDiagnosticSnapshot(state.Target == null ? "(destroyed)" : state.Target.name,
+                        state.Target == null ? 0 : state.Target.GetInstanceID(), state.Active.OperationId,
+                        state.Generation, state.Active.IsReversing));
+            return snapshots.AsReadOnly();
+        }
         public void SetReducedMotion(bool enabled)
         {
             ThrowIfDisposed();

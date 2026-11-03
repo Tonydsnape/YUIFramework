@@ -3,6 +3,11 @@
   "rootNamespace": "YUIFramework.Tests",
   "references": [
     "YUIFramework.Runtime",
+    "YUIFramework.CodeLoading",
+    "YUIFramework.Hotfix.Sample",
+    "YUIFramework.Hotfix.AotSample",
+    "YUIFramework.Bootstrap",
+    "Unity.ugui",
     "YUIFramework.Config",
     "YUIFramework.Localization",
     "YUIFramework.Examples",

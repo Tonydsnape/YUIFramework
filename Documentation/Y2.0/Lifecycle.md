@@ -88,6 +88,13 @@ Disposing the operation disposes its linked token source, clears the context's c
 
 ## Close, pool, and release
 
+Optional stage-13 diagnostics reuses `UIContextOperation.Id` for each lifecycle
+execution, records canonical state phases and links nested loads/transitions.
+Normal terminal cleanup cancels LifetimeToken without misreporting successful
+Close/Release as Canceled; actual cancellation and rollback retain their outcome.
+Terminal-owner audit and late/noncooperative residue are observation, not new
+lifecycle behavior. See [Diagnostics.md](Diagnostics.md).
+
 Closing an opened context runs `Hiding`, the hide transition, `OnHide`, then `Hidden`; it then enters `Closing` and runs `OnClose`. `CloseDisposition` states the intended terminal action before callbacks observe it:
 
 - `Pool`: cache the context and finish in `Pooled`.
@@ -174,3 +181,18 @@ transition rollback, or ViewModel ownership. Suspension cancels item work and dr
 then restores the stable anchor and rebinds on resume. Canceled close keeps the live display.
 Dispose the list before shutting down its caller-owned resource service. See
 [Virtualization.md](Virtualization.md).
+
+## Stage 12 scene and system owners
+
+`UIScope` adds no Context states or competing DisplayToken. Its identity is the
+existing pool scope; ending it cancels tracked work, prunes navigation on the
+existing FIFO, closes active/hidden contexts on their type lanes and evicts idle
+instances. Scope cleanup ignores the ended operation token so cleanup can finish,
+attempts every type and aggregates failures. Ending-scope type handoff cannot
+destroy a newer scope's replacement. Legacy pool-only ReleaseScopeAsync remains
+idle-only. Global persists across scene changes and ends with manager shutdown.
+
+`UIConfirmationContext` resolves a typed session once. Successful external hide/
+release is Dismissed; caller/owner cancellation remains cancellation. Canceled
+close rollback never resolves a session or ends its display. Notification-driven
+close is deferred outside lifecycle reentrancy guards. See [SystemUI.md](SystemUI.md).

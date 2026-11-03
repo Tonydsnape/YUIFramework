@@ -1,0 +1,5 @@
+{
+  "name": "YUIFramework.CodeLoading",
+  "references": ["YUIFramework.Runtime", "YUIFramework.Bootstrap", "UniTask"],
+  "autoReferenced": true
+}

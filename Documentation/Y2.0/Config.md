@@ -12,6 +12,14 @@ The target has its own tool manifest/lock; no source `.git` or `node_modules` is
 
 ## Pipeline
 
+Stage 14 adds an optional [Editor page wizard](EditorTooling.md) in front of this
+same pipeline. It safely proposes an additive designer row and generates an
+explicit typed `Registration.Map(snapshot)`; the existing exporter still owns all
+three-table publication and `RegisterBatch` still validates the resulting batch.
+No static Context discovery, second table schema or runtime registration store is
+introduced. Production validation also decodes actual collected Config bytes and
+compares them to the inspected authoring snapshots.
+
 `Excel -> validation -> JSON + MessagePack + typed C# -> YooAsset -> ConfigService
 -> explicit Context map -> UIManager.RegisterBatch -> business entry`
 
@@ -127,6 +135,14 @@ records or invalid records anywhere in the loaded UI table fail before registeri
 selected UI. Test registrations intentionally remain manual to verify compatibility.
 The existing Editor directory contains a BootstrapProfile editor, not a UI registration
 code-generation template, so no hidden handwritten template remains.
+
+Stage 12 adds a separate `system` profile with five explicit mappings:
+SystemUISamplePage, SystemLoading, SystemToast, SystemConfirmation and SystemNotice.
+The original six rows and login-cover game startup remain unchanged. The additive
+`extend-system-ui-workbook.js` tool preserves existing designer rows; the normal
+transactional exporter publishes the eleven-row table to JSON/MessagePack. Modal
+layers, caching and unscaled fades use the existing full schema, not new runtime
+defaults or a parallel Config store. See [SystemUI.md](SystemUI.md).
 
 The existing page buttons now address their owning `Services`, not the unrelated singleton.
 Unavailable page mappings disable navigation buttons. Unity 2022.3 requires

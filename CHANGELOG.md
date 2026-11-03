@@ -6,6 +6,58 @@ All notable changes to YUIFramework are documented in this file.
 
 ### Added
 
+- Stage 15 independent public-only Hotfix.Sample and downstream AOT CodeLoading
+  extension using existing Bootstrap code/game boundaries. Verified asynchronous
+  DLL TextAsset leases, trusted identity/hash, explicit preloaded mock and Mono
+  runtime, irreversible loading/constructor cancellation and stock-IL2CPP refusal.
+- Early concrete/public-parameterless Context validation for both reflected
+  manager construction paths, explicit sample linker roots, executable AOT
+  generic witnesses and defining-assembly/base-player-specific metadata draft.
+- Runnable AOT sample, actual external Mono DLL/Bootstrap tests and isolated High
+  stripping build/Player probe. No HybridCLR package, metadata generation, DLL
+  publishing or device certification is introduced; see
+  `Documentation/Y2.0/HybridCLRBoundary.md` and the actual Testing evidence.
+- The AOT sample shares a Task-backed startup run between its error observer and
+  destruction drain, instead of concurrently consuming a pending preserved
+  UniTask. Real Start/immediate-destroy and normal-startup regressions verify
+  shutdown ordering, owned view/root cleanup and zero continuation failures.
+
+- Stage 14 Editor authoring and build gates: transactional partial
+  Context/ViewModel/serialized UIView generation, additive Excel row and existing
+  typed Config/batch mapping, generated-file ownership and hand-code protection.
+- Scoped locatable prefab/scene/content/resource checks, real YooAsset collector
+  mappings, explicit navigation/dependency visualization and actual Config-driven
+  language/theme/font/Sprite/Material device previews with transient TMP isolation.
+- Explicit MinimalDemo/Production profiles, fail-closed Player preprocess and CI
+  entries, actual-scene Production build wrapper and audited external workspace
+  preparation without moving the existing Resources login/demo assets.
+- Official YooAsset 3 Legacy local bundle build, target/module checks, report/version
+  output hashes and append-only history. Editor rendering and actual bundle/Player
+  hook evidence are separate from mobile release/performance certification.
+  See `Documentation/Y2.0/EditorTooling.md`.
+
+- Stage 13 opt-in instance diagnostics: bounded structured events with explicit
+  navigation/context/load/native/lease/transition correlation, immutable runtime
+  snapshots, exact typed duplicate subscriptions, ended-owner residue and
+  clock-injected timeout checks. Explicit adapter flush isolates/quarantines
+  external failures without interrupting lifecycle/resource queues.
+- Real ProfilerRecorder sampling with runtime marker enumeration, nullable
+  unavailable values, target/scenario-specific Android/mobile/Editor budgets and
+  honest coverage limits. Runnable gated `UIDiagnosticsSample` with manual
+  refresh/filter/details, existing modal/focus/Back, real fault injection/cleanup
+  and bounded uGUI text; no telemetry SDK, build checker or device FPS claim.
+
+- Stage 12 scene/system UI: instance Global/Scene/Module lifetime scopes reuse pool
+  identities; real scene change/unload cancels work and drains active/hidden UI,
+  navigation and leases without changing idle-only pool release.
+- Reference-counted cancelable weighted Loading, bounded/merged/prioritized/rate-limited
+  Toast tickets, FIFO typed confirmation results and global disconnected/maintenance/
+  force-update policies. Unified scene input reads existing root locks/modals;
+  modal Back never pops a covered page.
+- Config-driven `SystemUISample` with five real code-built views, preserved original
+  six registrations and login-cover startup, scope/cancellation/resource regression
+  tests and installed/no-vendor acceptance evidence.
+
 - Stage 11 localization: original zh-CN/en/fr Excel sample, transactional
   export and shared immutable typed catalog, instance key lookup with explicit
   fallback/error results, event-driven Text/TMP component and searchable Inspector

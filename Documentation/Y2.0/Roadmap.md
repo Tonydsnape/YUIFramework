@@ -2,7 +2,7 @@
 
 Y2.0 uses one development line and advances through strict stage gates. Only one stage is implemented at a time. Code, tests, documentation, and acceptance must be complete before the next stage begins.
 
-**Progress: stages 0-11 complete (12 of 17 stages). Stage 12 has not started.**
+**Progress: stages 0-15 complete (16 of 17 stages). Stage 16 has not started.**
 
 Independent post-stage-10 work: **Config integration complete**. This connects the
 Excel toolchain, atomic typed snapshots and existing UI registrations; it does not
@@ -14,6 +14,40 @@ content, transient device previews, licensed WenKai TMP glyphs/fallback, localiz
 font/sprite/material resources, typed themes and accessibility/formatting extensions.
 Node 31/31; full installed-vendor 195 Edit / 170 Play; no-vendor 195 Edit / 155 Play.
 See [Localization.md](Localization.md), [Presentation.md](Presentation.md) and Testing.md.
+
+Stage 12 adds scene-owned UI/task cleanup, reference-counted Loading, bounded Toast,
+typed confirmation and global system policies, plus unified scene/modal Back input
+and a runnable Config-driven sample. Node 32/32; full installed-vendor
+212 Edit / 201 Play; no-vendor 212 Edit / 186 Play.
+See [SystemUI.md](SystemUI.md) and [Testing.md](Testing.md).
+
+Stage 13 adds opt-in correlated runtime diagnostics, exact owner/duplicate/timeout
+inspection, actual ProfilerRecorder sampling and a gated runnable Debug panel.
+Full installed-vendor 220 Edit / 214 Play; no-vendor 220 Edit / 199 Play.
+Mobile budgets are targets, not Editor-derived device certification.
+See [Diagnostics.md](Diagnostics.md) and [Testing.md](Testing.md).
+
+Stage 14 adds transactional Editor page authoring, real scoped prefab/resource
+checks and locatable reports, configured device previews and explicit graphs,
+fail-closed build profiles/CI hooks and official YooAsset bundle reports/history.
+Node 33/33 with three-table validation and six-directory generated parity.
+Full installed/no-vendor Edit each pass 246 with five Explicit cases separately
+verified; Play passes 214/199. Actual D3D11 rendering and a real local Windows
+bundle are verified, not mobile performance or production deployment.
+See [EditorTooling.md](EditorTooling.md) and [Testing.md](Testing.md).
+
+Stage 15 adds public-only Hotfix.Sample, an AOT downstream code/game adapter,
+explicit reflected construction contracts, executable generic witnesses,
+sample linker roots and a target/base-player-specific metadata draft.
+Actual Android ARM64 IL2CPP High stripping/native/APK build and retained-member
+inspection pass; a distinct High-stripped Windows Mono Player executes the
+reflected entry, generic Open, Type prewarm and cleanup. Full installed/no-vendor
+Edit each pass 252 (five historical stage-14 Explicit skips); refreshed Play
+passes 221/206. Real pending-Start destruction first reproduces the continuation
+failure, then verifies Task-backed run drain before shutdown and owned cleanup;
+High-stripped native builds and Mono execution are refreshed for that fix.
+No HybridCLR installation, metadata generation, DLL publishing or device run.
+See [HybridCLRBoundary.md](HybridCLRBoundary.md) and [Testing.md](Testing.md).
 
 ## Fixed decisions
 
@@ -42,10 +76,10 @@ See [Localization.md](Localization.md), [Presentation.md](Presentation.md) and T
 | 9 (complete) | Messaging and MVVM lifecycle | Typed messages, scoped subscriptions, commands, common bindings, cancellation, and pooling are safe |
 | 10 (complete) | Commercial virtual list | Licensed SuperScrollView List/Grid, dynamic List sizes, stable-ID changes/anchors, async leases, nested drag, and 10,000-row/no-vendor gates pass; see Virtualization.md and Testing.md |
 | 11 (complete) | Mobile adaptation, localization, and themes | Six device geometries, live language/theme/accessibility, real WenKai glyph/raster/bounded fallback, async leases and transient Editor checks verified |
-| 12 (not started) | Scene and system UI services | UI scopes, scene cleanup, reference-counted loading, Toast throttling, and Dialog results are stable |
-| 13 | Diagnostics and performance budgets | Runtime state, ownership, operations, leaks, timings, and uGUI cost can be inspected |
-| 14 | Editor tooling and build gates | Generation, prefab/resource/performance checks, previews, and YooAsset reports block invalid builds |
-| 15 | HybridCLR boundary validation | AOT/Hotfix sample boundaries, generic risks, stripping rules, and the DLL-loading extension point are proven |
+| 12 (complete) | Scene and system UI services | UI scopes, scene cleanup, reference-counted loading, Toast throttling, and Dialog results are stable |
+| 13 (complete) | Diagnostics and performance budgets | Runtime state, ownership, operations, leaks, timings, and uGUI cost can be inspected |
+| 14 (complete) | Editor tooling and build gates | Generation, prefab/resource/performance checks, previews, and YooAsset reports block invalid builds |
+| 15 (complete) | HybridCLR boundary validation | Public-only Hotfix, verified-resource code extension, actual IL2CPP High retained-member/native build, separate stripped Mono execution, generic witnesses and future metadata draft verified |
 | 16 | Package and release candidate | UPM layout, samples, migration, docs, tests, and Android/iOS development-build smoke tests pass |
 
 ## Stage protocol
@@ -71,7 +105,12 @@ No later-stage implementation is mixed into an earlier stage merely because the 
 
 ## HybridCLR boundary
 
-The future code-hot-update bootstrap must run after YooAsset has made resources available. The AOT bootstrap exposes an extension point for loading assemblies, but Y2.0 does not bind Runtime to HybridCLR. A dedicated Hotfix sample assembly will prove that business UI can register and open pages using only public AOT contracts.
+The future code-hot-update bootstrap runs after YooAsset readiness. The implemented
+CodeLoading adapter reuses the AOT Bootstrap extension points; Runtime/Bootstrap
+never reference Hotfix business or HybridCLR. The dedicated sample compiles and
+registers/opens through public APIs. Actual IL2CPP build/stripping inspection is
+not a claim that downloaded code executes on stock IL2CPP, unknown generic value
+types are covered, or Android/iOS device code-hot-update was tested.
 
 ## Out of scope for this roadmap
 

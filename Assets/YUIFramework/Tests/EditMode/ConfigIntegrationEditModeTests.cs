@@ -216,7 +216,7 @@ namespace YUIFramework.Tests
             var service = SampleUIConfiguration.Create(new EditorJsonConfigSource(), ConfigFormat.Json);
             var snapshot = await service.InitializeAsync();
             var table = snapshot.Get(UISettings.Table);
-            Assert.That(table.Count, Is.EqualTo(6));
+            Assert.That(table.Count, Is.EqualTo(11));
             Assert.That(table.Get("bootstrap", "HelloPage").UseTransition, Is.False);
             Assert.That(table.Get("y2", "SampleHelloPage").PreloadCount, Is.EqualTo(2));
             Assert.That(table.Get("hello", "SecondSamplePage").SlideDistance, Is.EqualTo(900));

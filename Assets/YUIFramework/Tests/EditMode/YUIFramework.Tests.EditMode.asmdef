@@ -3,6 +3,12 @@
   "rootNamespace": "YUIFramework.Tests",
   "references": [
     "YUIFramework.Runtime",
+    "YUIFramework.CodeLoading",
+    "YUIFramework.Hotfix.Sample",
+    "YUIFramework.Editor",
+    "YUIFramework.Tests.PlayMode",
+    "YooAsset",
+    "YooAsset.Editor",
     "YUIFramework.Config",
     "YUIFramework.Localization",
     "YUIFramework.Localization.Editor",

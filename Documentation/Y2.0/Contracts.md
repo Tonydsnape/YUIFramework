@@ -1,5 +1,22 @@
 # Y2 Runtime Contracts
 
+## Editor authoring and release policy
+
+Stage 14's [Editor tooling](EditorTooling.md) reuses the existing Config batches,
+resource addresses and presentation core. Generated controls are serialized
+required references; hand partials and designer rows remain owned by their authors.
+`UIRequiredReferenceAttribute` is metadata, not runtime reflection/scanning.
+Editor previews own only transient clones/settings scopes, never application
+services or source font/material/atlas assets.
+
+Player builds now require an explicit MinimalDemo or Production `UIBuildProfile`.
+The real preprocess hook and batch commands share one scoped validator.
+Production uses `UIBuildGate.BuildPlayer(options, profile)` to audit actual scenes;
+it never silently exempts built-in Resources or guesses unregistered business
+loads/navigation. External demo-exclusion workspace preparation is explicitly
+not validation. Official YooAsset bundle reports/version history are local output,
+not certification of a device, backend deployment or runtime performance budget.
+
 ## Service ownership
 
 Y2 code owns an `IUIService` instance and injects it at the application composition root:
@@ -21,6 +38,15 @@ await ui.ShutdownAsync();
 Shutdown stops both the per-type operation coordinator and the navigator's FIFO queue from accepting new commands, cancels the service lifetime so in-flight and still-queued operations observe cancellation, drains every lane (queued and running) before touching any state, closes active contexts, destroys pooled contexts, clears navigation/messages/registration, then disposes the root runtime. The injected resource loader is caller-owned; Y2 does not dispose it. External root/EventSystem objects remain caller-owned. See [Navigation.md](Navigation.md) and [UIRootAndInput.md](UIRootAndInput.md).
 
 ## Initialization rules
+
+Stage 12 adds instance-owned `IUIService.Scopes` and `InputArbiter`.
+`UIScope` reuses `UIPoolScope` identity but owns tasks and active/hidden UI as
+well as idle entries. Real scene changes/unloads start teardown; await scope
+release for a completed boundary. Manager shutdown cancels/drains scope work
+before stopping the existing lanes/root. Loading, bounded Toast, FIFO typed
+confirmation and global application notice policies borrow the same runtime.
+They never dispose injected resources/Config/presentation/localization.
+See [SystemUI.md](SystemUI.md) for cancellation, input and ownership contracts.
 
 The optional [text localization](Localization.md) service borrows the instance Config
 owner, reads its immutable catalog and never owns table leases or a second config store.
@@ -47,6 +73,13 @@ and text cleanup; external services remain alive.
 
 ## Async baseline
 
+Stage 13 adds optional borrowed `UIDiagnostics` to UIManager and UIResourceService,
+not a second registry or singleton. Correlated immutable execution/ownership
+snapshots, bounded events, explicit adapter flush/quarantine, actual profiler
+sampling and target-specific budgets are defined in [Diagnostics.md](Diagnostics.md).
+Defaults remain uninstrumented; the Dev panel/sampler are gated. No observer
+owns UI resources, Config, localization or application cancellation.
+
 Runtime, navigation, resource, and transition asynchronous contracts use:
 
 - `UniTask` / `UniTask<T>`
@@ -58,6 +91,16 @@ Each context operation links the caller, context lifetime, and service lifetime 
 Lifecycle callback failures record `LastFailure` and surface as metadata-rich `UILifecycleException`. Rollback failures force release rather than retaining a damaged active or pooled context. See [Lifecycle.md](Lifecycle.md) for the complete state graph and callback phases.
 
 ## Registry
+
+Stage 15 makes the existing reflection contract explicit:
+`UIConfigRegistration.ValidateContextType`, `For<T>` and `Register<T>` require a
+concrete closed Context class with a public parameterless constructor, before
+publishing registration. Both generic Open and Type-based prewarm still construct
+through Activator; this is not a factory API. Preserve/link.xml and concrete AOT
+witnesses do not prove unknown generic IL2CPP combinations.
+The optional borrowed CodeLoading extension reuses Bootstrap readiness and never
+introduces a Runtime/Bootstrap dependency on Hotfix business or HybridCLR.
+See [HybridCLRBoundary.md](HybridCLRBoundary.md).
 
 The independent [Config integration](Config.md) adds `ConfigService` atomic typed
 snapshots and `UIManager.RegisterBatch(IReadOnlyList<UIConfigRegistration>)`.

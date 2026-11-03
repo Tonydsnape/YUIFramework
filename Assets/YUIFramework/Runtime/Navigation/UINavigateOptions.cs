@@ -5,6 +5,7 @@ namespace YUIFramework
     /// </summary>
     public sealed class UINavigateOptions
     {
+        public UIPoolScope Scope { get; set; } = UIPoolScope.Global;
         /// <summary>
         /// 历史兼容字段，Phase 3 起不再生效。当前导航策略始终只显示栈顶页面。
         /// </summary>

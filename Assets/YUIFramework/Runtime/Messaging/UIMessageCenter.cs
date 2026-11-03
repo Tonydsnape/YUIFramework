@@ -16,6 +16,31 @@ namespace YUIFramework
         private long _nextSequence;
 
         public int ListenerCount => _subscriptions.Count;
+        internal int CountDiagnosticOwner(object owner)
+        {
+            EnsureOwningThread();
+            var count = 0;
+            foreach (var subscription in _subscriptions.Values)
+                if (ReferenceEquals(subscription.Owner, owner)) count++;
+            return count;
+        }
+        public IReadOnlyList<UISubscriptionDiagnosticSnapshot> GetDiagnosticSubscriptions()
+        {
+            EnsureOwningThread();
+            var snapshots = new List<UISubscriptionDiagnosticSnapshot>(_subscriptions.Count);
+            foreach (var subscription in _subscriptions.Values)
+            {
+                var duplicates = 0;
+                foreach (var other in _subscriptions.Values)
+                    if (subscription.MessageName == other.MessageName &&
+                        subscription.PayloadType == other.PayloadType &&
+                        ReferenceEquals(subscription.Owner, other.Owner) &&
+                        subscription.Handler.Equals(other.Handler)) duplicates++;
+                snapshots.Add(new UISubscriptionDiagnosticSnapshot(subscription, duplicates));
+            }
+            snapshots.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
+            return snapshots.AsReadOnly();
+        }
 
         public UIMessageScope CreateScope(
             string name = null,

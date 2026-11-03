@@ -41,6 +41,13 @@ namespace YUIFramework
                 case "y2":
                     registrations.Add(UIConfigRegistration.For<SampleHelloPage>(Take(configs, "SampleHelloPage")));
                     break;
+                case "system":
+                    registrations.Add(UIConfigRegistration.For<SystemUISamplePage>(Take(configs, "SystemUISamplePage")));
+                    registrations.Add(UIConfigRegistration.For<SampleLoadingContext>(Take(configs, "SystemLoading")));
+                    registrations.Add(UIConfigRegistration.For<SampleToastContext>(Take(configs, "SystemToast")));
+                    registrations.Add(UIConfigRegistration.For<SampleConfirmationContext>(Take(configs, "SystemConfirmation")));
+                    registrations.Add(UIConfigRegistration.For<SampleSystemContext>(Take(configs, "SystemNotice")));
+                    break;
                 default: throw new ConfigDataException($"Unknown UI profile: {profile}");
             }
             if (configs.Count != 0) throw new ConfigDataException("UI table has records without an explicit typed mapping.");

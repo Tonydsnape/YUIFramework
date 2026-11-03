@@ -5,7 +5,22 @@ FIFO transaction queue, and defines a conservative, testable single-flight merge
 policy for concurrent `OpenAsync<T>` calls. Stage 4 preserves those transaction rules and
 adds sorting/modal/focus state through the same lifecycle calls.
 
+Stage 12 adds `UINavigateOptions.Scope` (default Global) to Push/Replace/BringToTop.
+`ui.Scopes.CurrentScene.PushAsync<T>()` uses the same navigator FIFO and links the
+scope token rather than creating another navigation stack. A Context type cannot
+be owned by two live UI scopes. Ending a scope cancels its navigation work, prunes
+its hidden/active entries and restores a surviving top without reviving an ending
+owner. `UIScope.ReleaseAsync` also closes active UI, unlike idle-only pool release.
+Top modal Back handlers run before page Back; unhandled modals block background
+navigation. See [SystemUI.md](SystemUI.md) for ownership and cancellation boundaries.
+
 ## Per-key coordination (`UIOperationCoordinator`)
+
+Stage 13 observes execution with a navigation span and explicit child IDs on
+Open/Close/Hide/Show. It does not time coordinator queue wait, add a second queue,
+or make unrelated direct opens children of a running navigation transaction.
+Single-flight first-open merging keeps one actual execution trace. Adapter code
+runs only at explicit diagnostic flush boundaries. See [Diagnostics.md](Diagnostics.md).
 
 `UIManager` owns one internal `UIOperationCoordinator` (created fresh by each
 `Initialize`/`InitializeAsync` call). It keys a FIFO lane by `Type` (the registered

@@ -107,6 +107,21 @@ namespace YUIFramework
             return _profile.GetIndex(context.Layer) > _profile.GetIndex(topModal.Layer);
         }
 
+        internal bool HasVisiblePage
+        {
+            get
+            {
+                foreach (var pair in _visible)
+                {
+                    if (pair.Value && pair.Key is BasePageContext page && page.IsFullScreen)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+
         public void Apply()
         {
             if (_disposed || _inputLocks == null || _modals == null)

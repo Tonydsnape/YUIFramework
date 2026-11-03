@@ -68,6 +68,15 @@ contexts have run their cleanup, so the center never becomes a static strong-ref
 
 ## Allocation boundary
 
+Stage 13 adds on-demand `UIMessageCenter.GetDiagnosticSubscriptions()` copies:
+topic/payload, owner metadata, handler identity, sequence/priority and actual
+same-topic/owner/Delegate.Equals duplicate count. No payloads or mutable channel
+collections are exposed. This allocating inspection is not run during Publish
+and does not change the original zero-allocation steady-publish assertion.
+Normal owner cleanup remains intact; diagnostics can detect bad late registration
+after destruction. Legacy closure wrappers cannot recover the original typed
+handler identity. See [Diagnostics.md](Diagnostics.md).
+
 The typed channel invokes `Action<T>` directly, so value payloads are not boxed. Subscription
 mutation allocates a replacement snapshot by design; steady-state publish does not. Stage 9
 measures the pure typed-publish loop separately from formatting strings and Unity control

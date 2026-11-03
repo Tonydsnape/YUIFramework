@@ -5,6 +5,13 @@ resources, Context and transition services. There is no second configuration
 store, static presentation singleton, Addressables or Unity Localization package.
 Stage 12 scene services and stage 14 build tooling are not part of this work.
 
+The subsequent [stage 14 Editor tools](EditorTooling.md) extend this same device
+preview, Config catalogs and transient-font mechanism. They apply actual
+locale/theme/font scale and collector-resolved font/Sprite/Material assets without
+saving source content; the separate graphics gate verifies real D3D11 pixels.
+Static atlas/layout warnings and Editor preview results are not mobile frame or
+memory certification.
+
 ## Run and maintain the example
 
 Use the existing `HelloUIBootstrap` in a scene. Its original Config startup now
