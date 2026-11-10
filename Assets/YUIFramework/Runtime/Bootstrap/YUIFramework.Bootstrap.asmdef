@@ -3,6 +3,7 @@
   "rootNamespace": "YUIFramework.Bootstrap",
   "references": [
     "YUIFramework.Runtime",
+    "Unity.TextMeshPro",
     "UniTask"
   ],
   "includePlatforms": [],

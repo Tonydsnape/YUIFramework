@@ -6,14 +6,13 @@ public sealed class MainMenuPageContext : BasePageContext
 {
     private Button _startButton;
     private Button _settingButton;
-    private Text _titleText;
 
     protected override void HandleInit()
     {
-        // ViewObject 就是 MainMenuPage.prefab 实例
-        _startButton = ViewObject.transform.Find("SafeArea/StartButton")?.GetComponent<Button>();
-        _settingButton = ViewObject.transform.Find("SafeArea/SettingButton")?.GetComponent<Button>();
-        _titleText = ViewObject.transform.Find("SafeArea/Title")?.GetComponent<Text>();
+        _startButton = ViewObject.transform
+            .Find("Bottom/Buttons_Group/Button_Battle")
+            ?.GetComponent<Button>();
+        _settingButton = ViewObject.transform.Find("Button_Setting")?.GetComponent<Button>();
 
         if (_startButton != null)
         {
@@ -28,11 +27,6 @@ public sealed class MainMenuPageContext : BasePageContext
 
     protected override void HandleShow(object args)
     {
-        if (_titleText != null)
-        {
-            _titleText.text = "YUIFramework Demo";
-        }
-
         Debug.Log("[MainMenuPage] Show");
     }
 

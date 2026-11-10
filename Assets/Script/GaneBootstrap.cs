@@ -34,7 +34,7 @@ public sealed class GameBootstrap : MonoBehaviour
         UIManager.Instance.Register<MainMenuPageContext>(new UIConfig
         {
             Id = "MainMenuPage",
-            PrefabKey = "UI/Pages/MainMenuPage",
+            PrefabKey = "UI/Pages/Home/Lobby",
             Layer = UILayer.Normal,
             CacheOnClose = true,
             FullScreen = true,
