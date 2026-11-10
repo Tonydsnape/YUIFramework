@@ -11,6 +11,10 @@ namespace YUIFramework
     /// </summary>
     public abstract class BaseContext : IUIContext
     {
+        private static long _diagnosticSequence;
+        internal long DiagnosticInstanceId { get; } = Interlocked.Increment(ref _diagnosticSequence);
+        internal string DiagnosticScope { get; set; }
+        internal UIDiagnosticSpan DiagnosticOperation => _currentOperation?.DiagnosticSpan;
         private bool _initialized;
         private bool _destroyed;
         private readonly List<UIMessageToken> _messageTokens = new List<UIMessageToken>();
@@ -124,10 +128,12 @@ namespace YUIFramework
         internal void TransitionTo(UIContextState state)
         {
             _stateMachine.TransitionTo(state);
+            DiagnosticOperation?.Mark(UIDiagnostics.StateName(state));
         }
 
         internal void RecordFailure(Exception exception, bool enterFaultedState)
         {
+            DiagnosticOperation?.Fail(exception);
             _stateMachine.RecordFailure(exception, enterFaultedState);
         }
 

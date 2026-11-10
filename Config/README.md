@@ -18,7 +18,29 @@ the initial six-record workbook with ExcelJS when it is missing; it deliberately
 refuses to replace an existing workbook. No game workbook or generated business
 repository was copied.
 
+`LocalizationTextConfig.xlsx` maintains the stage-11 nine-key text sample (zh-CN/en/fr).
+`npm.cmd run sample:localization` creates it only when absent. Its required typed
+catalog participates in the same transaction as UISettings. Duplicate keys, unknown
+locale columns, malformed positional formats and inconsistent argument indices fail
+before publication. See [text localization](../Documentation/Y2.0/Localization.md)
+for the schema, key picker, runtime APIs and explicit fallback policy.
+
+`UIPresentationConfig.xlsx` adds typed theme Color/Font/Sprite/Material tokens
+and locale Font/Sprite overrides to the same atomic publication. The sixteen-row
+sample drives the existing Hello/verified-Bootstrap UI with WenKai TMP fonts.
+See [presentation](../Documentation/Y2.0/Presentation.md) for asset addresses,
+licensed font provenance, runtime switching and safe-area/accessibility controls.
+
 ## Workbook protocol
+
+The optional **Tools > YUIFramework > Editor tooling > Generate page** wizard
+uses `tools\propose-ui-page.js` to propose an additive `UISettings` row without
+overwriting designer values, then commits it with owned page code under exception
+rollback. The helper itself writes no source file; its CLI returns proposed bytes.
+Export remains the existing explicit command/transaction below, not an automatic
+new registry. Do not edit the workbook concurrently with generation.
+See [Editor tooling](../Documentation/Y2.0/EditorTooling.md) for generation,
+compilation, serialized prefab binding and production packaged-Config checks.
 
 Every data worksheet has A1=`Name`, B1=table name, C1=`Type`, D1=`base` or `normal`;
 A2=`Key`, B2=positive key depth. Optional C2=`Required`, D2=Excel boolean defaults true.

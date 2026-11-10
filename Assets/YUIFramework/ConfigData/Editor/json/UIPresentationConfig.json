@@ -1,0 +1,140 @@
+{
+  "theme.light": {
+    "text": {
+      "Group": "theme.light",
+      "Key": "text",
+      "Kind": "Color",
+      "Value": "#202020",
+      "HighContrast": "#000000",
+      "Package": null
+    },
+    "panel": {
+      "Group": "theme.light",
+      "Key": "panel",
+      "Kind": "Color",
+      "Value": "#F4EFE4",
+      "HighContrast": "#FFFFFF",
+      "Package": null
+    },
+    "body": {
+      "Group": "theme.light",
+      "Key": "body",
+      "Kind": "Font",
+      "Value": "YUIPresentation/WenKai",
+      "HighContrast": null,
+      "Package": null
+    },
+    "badge": {
+      "Group": "theme.light",
+      "Key": "badge",
+      "Kind": "Sprite",
+      "Value": "YUIPresentation/BadgeEn",
+      "HighContrast": null,
+      "Package": null
+    },
+    "surface": {
+      "Group": "theme.light",
+      "Key": "surface",
+      "Kind": "Material",
+      "Value": "YUIPresentation/Panel",
+      "HighContrast": null,
+      "Package": null
+    }
+  },
+  "theme.dark": {
+    "text": {
+      "Group": "theme.dark",
+      "Key": "text",
+      "Kind": "Color",
+      "Value": "#F0EEE8",
+      "HighContrast": "#FFFFFF",
+      "Package": null
+    },
+    "panel": {
+      "Group": "theme.dark",
+      "Key": "panel",
+      "Kind": "Color",
+      "Value": "#202830",
+      "HighContrast": "#000000",
+      "Package": null
+    },
+    "body": {
+      "Group": "theme.dark",
+      "Key": "body",
+      "Kind": "Font",
+      "Value": "YUIPresentation/WenKai",
+      "HighContrast": null,
+      "Package": null
+    },
+    "badge": {
+      "Group": "theme.dark",
+      "Key": "badge",
+      "Kind": "Sprite",
+      "Value": "YUIPresentation/BadgeEn",
+      "HighContrast": null,
+      "Package": null
+    },
+    "surface": {
+      "Group": "theme.dark",
+      "Key": "surface",
+      "Kind": "Material",
+      "Value": "YUIPresentation/Panel",
+      "HighContrast": null,
+      "Package": null
+    }
+  },
+  "locale.en": {
+    "body": {
+      "Group": "locale.en",
+      "Key": "body",
+      "Kind": "Font",
+      "Value": "YUIPresentation/WenKai",
+      "HighContrast": null,
+      "Package": null
+    },
+    "badge": {
+      "Group": "locale.en",
+      "Key": "badge",
+      "Kind": "Sprite",
+      "Value": "YUIPresentation/BadgeEn",
+      "HighContrast": null,
+      "Package": null
+    }
+  },
+  "locale.zh-CN": {
+    "body": {
+      "Group": "locale.zh-CN",
+      "Key": "body",
+      "Kind": "Font",
+      "Value": "YUIPresentation/WenKai",
+      "HighContrast": null,
+      "Package": null
+    },
+    "badge": {
+      "Group": "locale.zh-CN",
+      "Key": "badge",
+      "Kind": "Sprite",
+      "Value": "YUIPresentation/BadgeZh",
+      "HighContrast": null,
+      "Package": null
+    }
+  },
+  "locale.fr": {
+    "body": {
+      "Group": "locale.fr",
+      "Key": "body",
+      "Kind": "Font",
+      "Value": "YUIPresentation/WenKai",
+      "HighContrast": null,
+      "Package": null
+    },
+    "badge": {
+      "Group": "locale.fr",
+      "Key": "badge",
+      "Kind": "Sprite",
+      "Value": "YUIPresentation/BadgeFr",
+      "HighContrast": null,
+      "Package": null
+    }
+  }
+}

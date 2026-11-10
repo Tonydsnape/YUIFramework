@@ -81,6 +81,10 @@ scope. Active UI is not treated as idle and is not destroyed by scope release; w
 closes, the ended scope forces destructive release instead of recaching it. This is pooling
 ownership only, not the stage 12 scene/system-UI service.
 
+Stage 12 now supplies `ui.Scopes` lifetime owners over these **same identities**.
+`UIScope.ReleaseAsync` closes active UI/tasks as well; the pool-only API above
+deliberately keeps its stage-7 behavior. See [SystemUI.md](SystemUI.md).
+
 ## Display scope
 
 `LifetimeToken` still spans `OnInit` through terminal `OnDestroy`. Every activation from new,

@@ -2,6 +2,7 @@ using UnityEngine;
 using Cysharp.Threading.Tasks;
 using UnityEngine.Events;
 using UnityEngine.UI;
+using YUIFramework.Localization;
 
 namespace YUIFramework
 {
@@ -21,6 +22,13 @@ namespace YUIFramework
         private UnityAction _virtualListAction;
         private UnityAction _mvvmAction;
         private UnityAction _publishAction;
+        private ConfigLocalizedText _localizedMessage;
+        private ConfigLocalizedText _localizedSwitch;
+        private Button _languageButton;
+        private SampleLocalizedHelloArgs _localizedArgs;
+        private BindingToken _localizationBindings;
+        private PresentationSampleView _presentation;
+        public override GameObject DefaultFocus => _presentation && _presentation.gameObject.activeSelf ? _presentation.FirstFocus : null;
 
         protected override void HandleInit()
         {
@@ -171,9 +179,20 @@ namespace YUIFramework
 
         protected override void HandleShow(object args)
         {
+            ClearLocalizationBindings();
             _nextButton.interactable = Services.IsRegistered<SecondSamplePage>();
             _virtualListButton.interactable = Services.IsRegistered<VirtualListSamplePage>();
             _mvvmButton.interactable = Services.IsRegistered<MvvmSamplePage>();
+            if (_languageButton) _languageButton.gameObject.SetActive(false);
+            if (_presentation) _presentation.gameObject.SetActive(false);
+            _messageText.transform.parent.gameObject.SetActive(true);
+            if (args is SampleLocalizedHelloArgs localized) _localizedArgs = localized;
+            else if (args != null) _localizedArgs = null;
+            if (_localizedArgs != null)
+            {
+                ShowLocalized(_localizedArgs);
+                return;
+            }
             var message = args as string;
             if (string.IsNullOrEmpty(message))
             {
@@ -184,8 +203,65 @@ namespace YUIFramework
             Debug.Log($"[SampleHelloPage] Show: {message}");
         }
 
+        private void ShowLocalized(SampleLocalizedHelloArgs args)
+        {
+            if (args.Presentation != null)
+            {
+                _messageText.transform.parent.gameObject.SetActive(false);
+                if (!_presentation)
+                {
+                    var root = CreateUIObject("Presentation", View.RectTransform);
+                    StretchFull(root); _presentation = root.gameObject.AddComponent<PresentationSampleView>();
+                }
+                _presentation.gameObject.SetActive(true);
+                _localizationBindings = new BindingToken();
+                _localizationBindings.Add(_presentation.Bind(args, this, Services));
+                _localizationBindings.Add(DisplayToken.Register(ClearLocalizationBindings));
+                return;
+            }
+            if (!_localizedMessage) _localizedMessage = _messageText.gameObject.AddComponent<ConfigLocalizedText>();
+            _localizedMessage.TextKey = new LocalizedTextKey("sample.greeting");
+            _localizedMessage.SetArguments(args.PlayerName);
+            _localizationBindings = new BindingToken();
+            _localizationBindings.Add(_localizedMessage.Bind(args.Localization, this));
+            if (!_languageButton)
+            {
+                var rect = CreateUIObject("LanguageButton", View.RectTransform);
+                rect.anchorMin = new Vector2(0.3f, 0.86f);
+                rect.anchorMax = new Vector2(0.7f, 0.94f);
+                rect.offsetMin = rect.offsetMax = Vector2.zero;
+                var image = rect.gameObject.AddComponent<Image>();
+                image.color = new Color(0.15f, 0.25f, 0.4f);
+                _languageButton = rect.gameObject.AddComponent<Button>();
+                _languageButton.targetGraphic = image;
+                var label = CreateUIObject("Label", rect);
+                StretchFull(label);
+                var text = label.gameObject.AddComponent<Text>();
+                text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                text.alignment = TextAnchor.MiddleCenter;
+                text.resizeTextForBestFit = true;
+                text.resizeTextMinSize = 16;
+                text.resizeTextMaxSize = 28;
+                _localizedSwitch = label.gameObject.AddComponent<ConfigLocalizedText>();
+                _localizedSwitch.TextKey = new LocalizedTextKey("sample.switch");
+            }
+            _languageButton.gameObject.SetActive(true);
+            _localizationBindings.Add(_localizedSwitch.Bind(args.Localization, this));
+            UnityAction changeLanguage = () =>
+                args.Localization.SetLocale(args.Localization.Locale == "en" ? "zh-CN" : "en");
+            _languageButton.onClick.AddListener(changeLanguage);
+            _localizationBindings.Add(() => {
+                if (_languageButton) _languageButton.onClick.RemoveListener(changeLanguage);
+            });
+            // The same Context can be shown again without ending its display scope.
+            // Replace that display's bindings instead of accumulating tracked tokens.
+            _localizationBindings.Add(DisplayToken.Register(ClearLocalizationBindings));
+        }
+
         protected override void HandleDestroy()
         {
+            ClearLocalizationBindings();
+            _localizedArgs = null;
             if (_closeButton != null && _closeAction != null)
             {
                 _closeButton.onClick.RemoveListener(_closeAction);
@@ -210,6 +286,15 @@ namespace YUIFramework
             {
                 _publishButton.onClick.RemoveListener(_publishAction);
             }
+        }
+
+        protected override void HandleClose() { ClearLocalizationBindings(); _localizedArgs = null; }
+
+        private void ClearLocalizationBindings()
+        {
+            var bindings = _localizationBindings;
+            _localizationBindings = null;
+            bindings?.Dispose();
         }
 
         private static RectTransform CreateUIObject(string name, RectTransform parent)

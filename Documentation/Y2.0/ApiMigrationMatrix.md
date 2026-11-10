@@ -7,6 +7,11 @@ This matrix records intent before implementation. Final Y2 names may be refined 
 | `UIManager.Instance` | Injected `IUIService` | Temporary facade; Y2 service available |
 | `UIManager.Init` | `Initialize` / `InitializeAsync` / `ShutdownAsync` | Obsolete forwarding overload implemented |
 | `Register<T>(UIConfig)` | Excel `UISettings` + explicit `UIConfigRegistration.For<T>` + `UIManager.RegisterBatch` | Manual mutable registration remains compatible; new batch inputs are validated copies |
+| Hardcoded text / source static localization utility | Excel `LocalizationTextConfig` + instance `TextLocalizationService` | `Get/TryGet` are strict; `Resolve` exposes explicit fallback/error status |
+| Source Unity Localization string/sprite event | `ConfigLocalizedText` key picker + `ConfigPresentationBinding` typed font/sprite tokens | Original instance DI; no Addressables or source-game singleton |
+| Per-page hardcoded scaler/safe insets | `UIRootRuntimeOptions.ScalePolicy` + `UISafeAreaContent` | Content only; blockers/backgrounds remain fullscreen |
+| Ad-hoc theme/font changes | `UIPresentationService` + immutable `UIPresentationCatalog` | Explicit resource leases; baseline restoration and no cumulative scaling |
+| Custom accessibility animation writer | `UIAccessibilityOptions` + existing `UITransitionRunner.SetReducedMotion` | No second tween/state engine; focused semantics/formatter/RTL extension points |
 | `OpenAsync<T>(object)` | UniTask/cancellation now; typed request later | `OpenHandleAsync<T>` added, object arguments retained |
 | `CloseAsync<T>()` | UniTask/cancellation and owning-service handle | Existing overload retained |
 | `UINavigator` | `IUINavigator`; command queue and transactions next | Interface and cancellation implemented; stage 3 adds FIFO queue, `IsBusy`, `BringToTopAsync<T>`, `NavigateBackAsync`, guards, and transaction rollback |
@@ -21,6 +26,9 @@ This matrix records intent before implementation. Final Y2 names may be refined 
 | `RemoteServices` static URL composition | `YooAssetBootstrapBackend` endpoint-scoped resolver | Obsolete facade only; Y2 path is application/channel/version/platform/package scoped |
 | `StartupFlowTrace` static sequence | Injected structured telemetry | Obsolete log facade has no retained sequence/state |
 | resource "hot update" terminology | resource bootstrap/resource update | Code loading is the independent `IBootstrapCodeLoader` extension point |
+| Implicit reflected Context construction failure during Open | `UIConfigRegistration.ValidateContextType` before Register/batch | Concrete closed class + public no-arg constructor; both generic Open and Type-based prewarm remain reflected |
+| Ad-hoc DLL loading before resource readiness | Optional AOT `ResourceHotfixCodeLoader` + `HotfixGameEntry` | Existing Bootstrap order, trusted identity/hash, borrowed leases and injected mock/Mono/future adapter; no installed HybridCLR |
+| Preserve treated as universal AOT generic support | Explicit sample roots + `HotfixAotWitness` + metadata-owner draft | Linker retention, concrete instantiations and future target/base-player-matched metadata are separate; see HybridCLRBoundary.md |
 | String message names | `UIMessageTopic<T>` + `IUIMessageBus` | `[Obsolete]` string overloads forward to the same typed channel engine |
 | Owner-only message cleanup | `UIMessageScope` or context lifetime/display helpers | Owner removal retained for the compatibility window |
 | Ad-hoc button callbacks | `UICommand` / `UIAsyncCommand` + `UIDataBinding.BindButton` | Awaitable failures/cancellation and CanExecute are now explicit |
@@ -49,6 +57,22 @@ This matrix records intent before implementation. Final Y2 names may be refined 
 | Numeric `UILayer` sorting | Validated ten-layer `UILayerProfile` | `Bottom` aliases `Background`; `Top` aliases `Toast`; legacy values remain source/binary compatible |
 | Monotonic sorting cursor | Bounded `UISortingLease` | Hidden retains; pool/release/failure disposes; `BringToTop` compacts |
 | Global input boolean | `UIInputLockService.Acquire` lease | Multiple owners and whitelist intersection |
+| Ad-hoc scene cleanup | `IUIService.Scopes` Global/Scene/Module lifetime owners | Reuses UIPoolScope identities; lifetime Release closes active UI/tasks; old pool Release stays idle-only |
+| Global-only page navigation | `UINavigateOptions.Scope` / `UIScope.PushAsync` | Existing FIFO/guards; default remains Global |
+| Gameplay input independent of UI | `IUIService.InputArbiter` | Uses existing locks/modal/fullscreen/focus/pointer state; scene controllers opt in |
+| Loading show/hide pairs | `UILoadingService.Begin` independent progress/cancellation handles | Last handle controls visibility; scope/caller cancellation removes only its handle |
+| Unbounded Toast list | `UIToastService.Enqueue` + unscaled Tick | Capacity/rate/merge/priority and explicit completion outcomes |
+| Callback-only confirmation | `UIConfirmationService<T>` / `UIConfirmationSession` | FIFO typed result; cancellation is not Declined; external close is Dismissed |
+| Bespoke disconnected/maintenance/update UI | `UISystemUIService<T>` | Global UI and explicit decisions; no network/store implementation |
+| Ad-hoc debug globals and resource-count guesses | Optional injected `UIDiagnostics`, owned `UIProfilerSampler` | Existing state remains authoritative; bounded immutable snapshots, explicit owner leases and exact typed duplicate detection |
+| Uncorrelated operation logs | Parent-linked lifecycle/Load/NativeLoad/Lease/Transition spans + `IUIDiagnosticsAdapter` | Explicit safe-boundary flush, adapter quarantine, monotonic execution timing; no SDK |
+| Editor FPS treated as a mobile result | `UIPerformanceBudget` / `UIPerformanceReport` | Actual target/scenario/environment/thresholds; unsupported is Unavailable and unmeasured mobile is NotValidated |
+| Runtime control-name searches / hand-edited generated code | `UIPageGenerator` serialized typed controls and owned `.g.cs` + hand partial | Source prefab and existing hand code remain unchanged; changed generated files, identity or source structure require explicit reconciliation |
+| Ad-hoc page setup and handwritten registration duplication | Additive `UISettings` row, existing exporter and generated `Registration.Map(snapshot)` | Same typed Config pipeline and `RegisterBatch`; no runtime type scan or second registry |
+| Implicit permissive Player builds | Explicit `UIBuildProfile` + `UIBuildGate` | Missing/incomplete/error profiles block; Production wrapper audits actual build scenes; audited MinimalDemo is not Production |
+| Scene-only Resources ignore list | Strict Production resource policy + `UIBuildWorkspace.Export` | Explicit external copy excludes audited demo inputs, preserves source login/demo assets, then requires revalidation |
+| Separate mock device/theme preview | Existing `UIDevicePreview` + `UIEditorPresentationPreview` | Real Config assets and deep transient TMP graphs; no source writes or runtime input locks |
+| Manual YooAsset report/version bookkeeping | `UIYooAssetBuilder.Build` and append-only external history | Official Legacy builder, actual files/SHA256, explicit target/module/cancel limitations; no upload or SDK |
 | Sample `Update` Escape handling | Runtime `UIInputRouter` | Routes to `NavigateBackAsync`; busy/in-flight deduplication |
 
 ## Lifecycle callback timing

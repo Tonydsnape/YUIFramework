@@ -36,6 +36,13 @@ namespace YUIFramework
         public Type CurrentPageType => CurrentEntry?.PageType;
         public bool IsBusy => _coordinator.IsBusy(LaneKey);
         public UINavigationGuard Guard { get; set; }
+        internal UIOperationId DiagnosticOperationId { get; private set; }
+        internal IReadOnlyList<BaseContext> GetDiagnosticStack()
+        {
+            var pages = new BaseContext[_pageStack.Count];
+            for (var i = 0; i < pages.Length; i++) pages[i] = _pageStack[i].Page;
+            return Array.AsReadOnly(pages);
+        }
 
         public UniTask<T> PushAsync<T>(
             object args = null,
@@ -45,10 +52,10 @@ namespace YUIFramework
         {
             cancellationToken.ThrowIfCancellationRequested();
             var effectiveOptions = options ?? new UINavigateOptions();
-            return EnqueueNavigationAsync(
+            return EnqueueScopedNavigationAsync(
                 "Push",
                 ct => PushCoreAsync<T>(args, effectiveOptions, ct),
-                cancellationToken);
+                effectiveOptions.Scope, cancellationToken, typeof(T));
         }
 
         public UniTask<BasePageContext> PopAsync(
@@ -70,10 +77,10 @@ namespace YUIFramework
         {
             cancellationToken.ThrowIfCancellationRequested();
             var effectiveOptions = options ?? new UINavigateOptions();
-            return EnqueueNavigationAsync(
+            return EnqueueScopedNavigationAsync(
                 "Replace",
                 ct => ReplaceCoreAsync<T>(args, effectiveOptions, ct),
-                cancellationToken);
+                effectiveOptions.Scope, cancellationToken, typeof(T));
         }
 
         public UniTask<T> BringToTopAsync<T>(
@@ -83,10 +90,11 @@ namespace YUIFramework
             where T : BasePageContext
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return EnqueueNavigationAsync(
+            var scope = options?.Scope ?? UIPoolScope.Global;
+            return EnqueueScopedNavigationAsync(
                 "BringToTop",
-                ct => BringToTopPublicCoreAsync<T>(args, ct),
-                cancellationToken);
+                ct => BringToTopPublicCoreAsync<T>(args, scope, ct),
+                scope, cancellationToken, typeof(T));
         }
 
         public UniTask<bool> BackAsync(CancellationToken cancellationToken = default)
@@ -134,12 +142,41 @@ namespace YUIFramework
             return _coordinator.DrainAsync();
         }
 
+        internal UniTask RemoveScopeAsync(UIPoolScope scope) =>
+            _coordinator.EnqueueAsync(LaneKey, "RemoveScope", async _ =>
+            {
+                for (var i = _pageStack.Count - 1; i >= 0; i--)
+                {
+                    if (!_uiManager.IsContextInScope(_pageStack[i].Page, scope) &&
+                        !IsRetired(_pageStack[i].Page.State)) continue;
+                    _uiManager.SetNavigationCoverage(_pageStack[i].Page, false);
+                    _pageStack.RemoveAt(i);
+                }
+                ApplyStackVisibility();
+                var top = CurrentEntry;
+                if (top != null && top.Page.State == UIContextState.Hidden &&
+                    !_uiManager.IsContextScopeEnding(top.Page) &&
+                    !_uiManager.ServiceLifetimeToken.IsCancellationRequested)
+                    await _uiManager.ShowForNavigationAsync(top.Page, top.Args, CancellationToken.None);
+            }, CancellationToken.None);
+
+        private UniTask<T> EnqueueScopedNavigationAsync<T>(
+            string name, Func<CancellationToken, UniTask<T>> work,
+            UIPoolScope scope, CancellationToken callerToken, Type targetType)
+        {
+            var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                callerToken, _uiManager.GetNavigationScopeToken(scope));
+            try { return AwaitAndDisposeAsync(EnqueueNavigationAsync(name, work, linked.Token, targetType), linked); }
+            catch { linked.Dispose(); throw; }
+        }
+
         private UIPageStackEntry CurrentEntry => _pageStack.Count > 0 ? _pageStack[_pageStack.Count - 1] : null;
 
         private UniTask<T> EnqueueNavigationAsync<T>(
             string operationName,
             Func<CancellationToken, UniTask<T>> work,
-            CancellationToken callerToken)
+            CancellationToken callerToken,
+            Type targetType = null)
         {
             var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
                 callerToken,
@@ -149,15 +186,27 @@ namespace YUIFramework
                 var queued = _coordinator.EnqueueAsync(
                     LaneKey,
                     operationName,
-                    work,
+                    ct => TraceNavigationAsync(operationName, work, ct, targetType),
                     linkedCancellation.Token);
                 return AwaitAndDisposeAsync(queued, linkedCancellation);
             }
+
             catch
             {
                 linkedCancellation.Dispose();
                 throw;
             }
+        }
+
+        private async UniTask<T> TraceNavigationAsync<T>(
+            string name, Func<CancellationToken, UniTask<T>> work, CancellationToken token, Type targetType)
+        {
+            using var span = _uiManager.Diagnostics?.Begin("Navigate", page: (targetType ?? CurrentPageType)?.Name,
+                phase: name, token: token);
+            DiagnosticOperationId = span?.Id ?? default;
+            try { return await work(token); }
+            catch (Exception exception) { span?.Fail(exception); throw; }
+            finally { DiagnosticOperationId = default; }
         }
 
         private static async UniTask<T> AwaitAndDisposeAsync<T>(
@@ -235,6 +284,7 @@ namespace YUIFramework
             {
                 throw new UINavigationRejectedException(request);
             }
+            _uiManager.ValidateNavigationScope<T>(options.Scope);
 
             // A duplicate push is never allowed to create a second stack entry for the
             // same context type, regardless of UINavigateOptions.BringExistingPageToTop.
@@ -244,13 +294,13 @@ namespace YUIFramework
                 {
                     // Same-type top push is a refresh only: it must not close/duplicate
                     // the refreshed instance.
-                    var refreshed = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken);
+                    var refreshed = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken, options.Scope);
                     ReplaceTopEntry(refreshed, args);
                     ApplyStackVisibility();
                     return refreshed;
                 }
 
-                return await BringToTopCoreAsync<T>(existingIndex, args, cancellationToken);
+                return await BringToTopCoreAsync<T>(existingIndex, args, cancellationToken, options.Scope);
             }
 
             var hidCurrent = false;
@@ -263,7 +313,7 @@ namespace YUIFramework
                     hidCurrent = true;
                 }
 
-                var page = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken);
+                var page = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken, options.Scope);
                 _pageStack.Add(CreateEntry(page, args));
                 ApplyStackVisibility();
                 return page;
@@ -376,12 +426,13 @@ namespace YUIFramework
             {
                 throw new UINavigationRejectedException(request);
             }
+            _uiManager.ValidateNavigationScope<T>(options.Scope);
 
             // Same-type top Replace is a refresh only: it must not close/duplicate the
             // refreshed instance, regardless of CloseCurrentPageOnReplace.
             if (currentEntry != null && currentEntry.PageType == targetType)
             {
-                var refreshed = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken);
+                var refreshed = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken, options.Scope);
                 ReplaceTopEntry(refreshed, args);
                 ApplyStackVisibility();
                 return refreshed;
@@ -392,7 +443,7 @@ namespace YUIFramework
             // CloseCurrentPageOnReplace (documented in Navigation.md).
             if (TryGetEntryIndex(targetType, out var existingIndex) && existingIndex != _pageStack.Count - 1)
             {
-                return await BringToTopCoreAsync<T>(existingIndex, args, cancellationToken);
+                return await BringToTopCoreAsync<T>(existingIndex, args, cancellationToken, options.Scope);
             }
 
             T opened = null;
@@ -400,7 +451,7 @@ namespace YUIFramework
             {
                 // Non-destructive-first: open the new target before destructively
                 // closing/hiding the current page.
-                opened = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken);
+                opened = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken, options.Scope);
 
                 if (currentEntry != null)
                 {
@@ -446,7 +497,8 @@ namespace YUIFramework
             }
         }
 
-        private async UniTask<T> BringToTopPublicCoreAsync<T>(object args, CancellationToken cancellationToken)
+        private async UniTask<T> BringToTopPublicCoreAsync<T>(
+            object args, UIPoolScope scope, CancellationToken cancellationToken)
             where T : BasePageContext
         {
             var targetType = typeof(T);
@@ -456,6 +508,7 @@ namespace YUIFramework
             {
                 throw new UINavigationRejectedException(request);
             }
+            _uiManager.ValidateNavigationScope<T>(scope);
 
             if (!TryGetEntryIndex(targetType, out var existingIndex))
             {
@@ -469,7 +522,7 @@ namespace YUIFramework
                         hidCurrent = true;
                     }
 
-                    var page = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken);
+                    var page = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken, scope);
                     _pageStack.Add(CreateEntry(page, args));
                     ApplyStackVisibility();
                     return page;
@@ -487,25 +540,26 @@ namespace YUIFramework
                 }
             }
 
-            return await BringToTopCoreAsync<T>(existingIndex, args, cancellationToken);
+            return await BringToTopCoreAsync<T>(existingIndex, args, cancellationToken, scope);
         }
 
         private async UniTask<T> BringToTopCoreAsync<T>(
             int existingIndex,
             object args,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            UIPoolScope scope = default)
             where T : BasePageContext
         {
             if (existingIndex < 0 || existingIndex >= _pageStack.Count)
             {
-                var reopened = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken);
+                var reopened = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken, scope);
                 ReplaceTopEntry(reopened, args);
                 return reopened;
             }
 
             if (existingIndex == _pageStack.Count - 1)
             {
-                var refreshed = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken);
+                var refreshed = await _uiManager.OpenForNavigationAsync<T>(args, cancellationToken, scope);
                 ReplaceTopEntry(refreshed, args);
                 return refreshed;
             }

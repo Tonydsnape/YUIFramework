@@ -1,0 +1,10 @@
+<linker>
+  <assembly fullname="YUIFramework.Hotfix.Sample">
+    <type fullname="YUIFramework.Hotfix.Sample.HotfixSampleEntry" preserve="all" />
+    <type fullname="YUIFramework.Hotfix.Sample.HotfixSamplePage" preserve="all" />
+  </assembly>
+  <assembly fullname="YUIFramework.CodeLoading">
+    <type fullname="YUIFramework.CodeLoading.IHotfixEntry" preserve="all" />
+    <type fullname="YUIFramework.CodeLoading.HotfixAotWitness" preserve="all" />
+  </assembly>
+</linker>

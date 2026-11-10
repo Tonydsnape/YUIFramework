@@ -1,0 +1,5 @@
+{
+  "name": "YUIFramework.Hotfix.Sample",
+  "references": ["YUIFramework.Runtime", "YUIFramework.CodeLoading", "UniTask", "Unity.ugui"],
+  "autoReferenced": false
+}

@@ -8,7 +8,7 @@ namespace YUIFramework
     /// <summary>
     /// 示例专用：用代码构建可实例化的 UIView 占位体。
     /// </summary>
-    public class CodeViewLoader : IResourceLoader
+    public class CodeViewLoader : IResourceLoader, System.IDisposable
     {
         private readonly Dictionary<string, GameObject> _prefabs = new Dictionary<string, GameObject>();
 
@@ -32,6 +32,17 @@ namespace YUIFramework
             {
                 Object.Destroy(instance);
             }
+        }
+
+        public void Dispose()
+        {
+            foreach (var prefab in _prefabs.Values)
+            {
+                if (prefab == null) continue;
+                if (Application.isPlaying) Object.Destroy(prefab);
+                else Object.DestroyImmediate(prefab);
+            }
+            _prefabs.Clear();
         }
 
         private static GameObject BuildCodePrefab(string key)

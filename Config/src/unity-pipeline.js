@@ -4,6 +4,8 @@ const { loadConfigurations, createArtifacts } = require('./exporter');
 const { generateCSharp } = require('./codegen');
 const { commitDirectories } = require('./transaction');
 const { validateUISchema } = require('./ui-schema');
+const { validateLocalizationSchema } = require('./localization-schema');
+const { validatePresentationSchema } = require('./presentation-schema');
 
 async function exportClientPipeline({
   rootDir = path.resolve(__dirname, '..'), projectRoot = path.resolve(__dirname, '..', '..'),
@@ -12,6 +14,8 @@ async function exportClientPipeline({
 } = {}) {
   const configurations = await loadConfigurations(rootDir);
   validateUISchema(configurations);
+  validateLocalizationSchema(configurations);
+  validatePresentationSchema(configurations);
   const artifacts = createArtifacts(configurations, 'client');
   const csharp = generateCSharp(configurations, namespace);
   const json = artifacts.map(a => ({ name: `${a.name}.json`, content: a.json }));

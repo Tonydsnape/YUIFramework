@@ -3,7 +3,32 @@
 Stage 5 replaces the ad-hoc `IResourceLoader` ownership rules with an explicit, testable
 resource ownership model. YooAsset 3.x is the only production backend.
 
+Stage-11 [localized presentation](Presentation.md) uses these same leases for
+font/sprite/material tokens. Each display binding owns its acquired bag; failed or
+superseded requests release partial/late leases, and visuals restore before old
+leases are released. TMP Settings intentionally keeps the sample WenKai baseline
+application-resident; zero display leases is not a claim that this globally
+referenced font has been unloaded. Production package addresses and dependency
+collection are explicit in Presentation.md.
+
+Stage-14 [Editor tooling](EditorTooling.md) checks those addresses against real
+YooAsset collector/package data and compares packaged Config bytes with the
+inspected snapshots. Production rejects implicit Player Resources inputs;
+MinimalDemo requires exact audited paths and is never production-certified.
+The existing Resources login/demo assets remain untouched. External workspace
+preparation can omit audited demo inputs, but must be revalidated and does not
+infer arbitrary code-only loads. Editor AssetDatabase preview reads are not a
+new synchronous production resource backend.
+
 ## Decisions
+
+Stage 15's optional `ResourceHotfixCodeLoader` reads DLL bytes using the same
+explicit package/TextAsset lease API after verified Bootstrap readiness.
+It releases its lease before assembly execution, borrows rather than shuts down
+the resource composition, and leaves zero-reference cache trim to the owner.
+Late noncooperative loads still drain through UIResourceService. SHA256 content
+identity is not signature verification, assembly unloading or proof of dynamic
+stock-IL2CPP support; see [HybridCLRBoundary.md](HybridCLRBoundary.md).
 
 - **YooAsset 3.x is the only production resource backend.**
 - **Addressables support is removed.** `AddressablesLoader`, the `YUIFRAMEWORK_ADDRESSABLES`
@@ -39,6 +64,11 @@ does not shut down its borrowed resource service. `UIConfig.PrefabPackage` now p
 to both instance prewarm and normal open; null preserves the existing default-package
 behavior. The production startup order remains verified Bootstrap resources, Config,
 typed UI batch registration, then business entry.
+
+The [text-localization table](Localization.md) uses the same TextAsset lease path,
+at YooAsset address `LocalizationTextConfig` beside `UISettings` in the configured
+package. Lookup/locale changes read the immutable snapshot and never acquire
+another asset lease. This does not implement localized sprite/font loading.
 
 1. **Single-flight.** Concurrent loads of the same key trigger exactly one native load.
    Every caller receives its own independent lease over the same underlying asset.
@@ -130,6 +160,14 @@ batch is cancelled, the already-acquired leases are released rather than leaked.
 
 ## Diagnostics and leak reporting
 
+Stage 13 optionally injects the same `UIDiagnostics` as UIManager. Per-request
+Load, shared NativeLoad and independently released Lease spans correlate with
+the existing Context operation. `LoadOwnedAssetAsync<T>(context, key, scope, token)`
+explicitly registers business ownership without taking over release/cancellation.
+Unregistered borrowed/global and legitimate pool leases remain outstanding
+references, not automatic leaks. Noncooperative native work stays visible until
+real completion; see [Diagnostics.md](Diagnostics.md) for coverage and budget limits.
+
 ```csharp
 var snapshot = resources.GetDiagnostics();
 Debug.Log(snapshot);                       // entry/lease/waiter/native counters
@@ -159,6 +197,14 @@ stage 5 path.
 Stage 7 instance prewarm is distinct from `IUIResourceService.PreloadAsync`: resource preload
 creates no GameObjects and ends with zero leases, while each idle prewarmed UI instance owns
 one `IUIInstanceLease` until pool eviction. See [Pooling.md](Pooling.md).
+
+Stage-12 lifetime `UIScope.ReleaseAsync` additionally closes active/hidden UI and
+drains tracked operations, releasing their instance leases before completion.
+Use scope.RunAsync with using/finally for operation-owned asset leases; canceled
+native loads retain the existing abandoned-load release continuation. Global UI
+leases survive scene changes. System UI never shuts down borrowed resources.
+CodeViewLoader remains an explicit minimal sample path, now IDisposable for its
+owner's generated prefab templates. See [SystemUI.md](SystemUI.md).
 
 ## Shutdown
 

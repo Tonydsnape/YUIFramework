@@ -7,8 +7,15 @@ Stage 2 gives every `BaseContext` one explicit state machine and at most one act
 The independent [Config startup](Config.md) precedes UI registration and does not add
 Context states. New UI batch configuration cannot replace active/pooled registrations.
 Config reload publishes data snapshots only; owners must explicitly shut down/reinitialize
-UI before applying a new registry. Teardown remains UI -> Config -> resource service ->
-Bootstrap; Config does not own injected resources.
+UI before applying a new registry. With [text localization](Localization.md),
+teardown is UI -> localization Dispose -> Config -> resource service -> Bootstrap;
+Config does not own injected resources. Localized text instead refreshes from successful
+Config publication without changing Context identity. Its component follows DisplayToken,
+detaches while disabled, defers while suspended, and rebinds on the next display.
+Stage-11 [presentation bindings](Presentation.md) follow the same token, cancel
+pending font/sprite/material work, restore baselines before releasing leases, and
+fence late completion with binding generations. Canceled close rollback retains
+the active binding. Dispose presentation after UI and before text/Config/resources.
 
 ```mermaid
 stateDiagram-v2
@@ -80,6 +87,13 @@ Every operation owns a linked `CancellationToken` composed from:
 Disposing the operation disposes its linked token source, clears the context's current operation, and decrements the service's in-flight count. The context lifetime is canceled and disposed during release. Shutdown cancels the service lifetime so in-flight operations observe cancellation. Shutdown-only cleanup operations deliberately omit the canceled service token so cleanup can finish.
 
 ## Close, pool, and release
+
+Optional stage-13 diagnostics reuses `UIContextOperation.Id` for each lifecycle
+execution, records canonical state phases and links nested loads/transitions.
+Normal terminal cleanup cancels LifetimeToken without misreporting successful
+Close/Release as Canceled; actual cancellation and rollback retain their outcome.
+Terminal-owner audit and late/noncooperative residue are observation, not new
+lifecycle behavior. See [Diagnostics.md](Diagnostics.md).
 
 Closing an opened context runs `Hiding`, the hide transition, `OnHide`, then `Hidden`; it then enters `Closing` and runs `OnClose`. `CloseDisposition` states the intended terminal action before callbacks observe it:
 
@@ -167,3 +181,18 @@ transition rollback, or ViewModel ownership. Suspension cancels item work and dr
 then restores the stable anchor and rebinds on resume. Canceled close keeps the live display.
 Dispose the list before shutting down its caller-owned resource service. See
 [Virtualization.md](Virtualization.md).
+
+## Stage 12 scene and system owners
+
+`UIScope` adds no Context states or competing DisplayToken. Its identity is the
+existing pool scope; ending it cancels tracked work, prunes navigation on the
+existing FIFO, closes active/hidden contexts on their type lanes and evicts idle
+instances. Scope cleanup ignores the ended operation token so cleanup can finish,
+attempts every type and aggregates failures. Ending-scope type handoff cannot
+destroy a newer scope's replacement. Legacy pool-only ReleaseScopeAsync remains
+idle-only. Global persists across scene changes and ends with manager shutdown.
+
+`UIConfirmationContext` resolves a typed session once. Successful external hide/
+release is Dismissed; caller/owner cancellation remains cancellation. Canceled
+close rollback never resolves a session or ends its display. Notification-driven
+close is deferred outside lifecycle reentrancy guards. See [SystemUI.md](SystemUI.md).

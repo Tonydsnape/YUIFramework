@@ -99,6 +99,10 @@ namespace YUIFramework.Editor
             {
                 ExecuteYooAssetMenu("YooAsset/AssetBundle Builder");
             }
+            if (GUILayout.Button("Open generation, validation and preview tools"))
+            {
+                UIEditorToolingWindow.Open();
+            }
         }
 
         private void Save()

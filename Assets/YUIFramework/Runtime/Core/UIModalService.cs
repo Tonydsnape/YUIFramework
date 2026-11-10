@@ -42,6 +42,7 @@ namespace YUIFramework
         public int Count => _stack.Count;
         public BaseContext Top => _stack.Count == 0 ? null : _stack[_stack.Count - 1];
         public GameObject MaskObject => _maskObject;
+        internal IReadOnlyList<BaseContext> GetDiagnosticStack() => _stack.AsReadOnly();
 
         public void Activate(BaseContext context)
         {

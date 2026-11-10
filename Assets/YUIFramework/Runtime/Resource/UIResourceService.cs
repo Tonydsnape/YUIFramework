@@ -26,11 +26,22 @@ namespace YUIFramework
         private long _nativeLoadCount;
         private long _nativeReleaseCount;
 
-        public UIResourceService(IUIResourcePackageRegistry registry = null)
+        public UIResourceService(IUIResourcePackageRegistry registry = null, UIDiagnostics diagnostics = null)
         {
             _registry = registry ?? new UIResourcePackageRegistry();
+            Diagnostics = diagnostics;
         }
 
+        public UIDiagnostics Diagnostics { get; }
+        public async UniTask<IUIAssetLease<T>> LoadOwnedAssetAsync<T>(
+            BaseContext owner, UIResourceKey key, UIScope scope = null,
+            CancellationToken cancellationToken = default) where T : UnityEngine.Object
+        {
+            if (owner == null) throw new ArgumentNullException(nameof(owner));
+            var lease = await AcquireAssetLeaseAsync(key, typeof(T), cancellationToken,
+                owner.DiagnosticOperation, owner, scope);
+            return new TypedAssetLease<T>(lease);
+        }
         public IUIResourcePackageRegistry Packages => _registry;
 
         public bool IsShutDown
@@ -69,12 +80,17 @@ namespace YUIFramework
             return AcquireAssetLeaseAsync(key, null, cancellationToken);
         }
 
-        public async UniTask<IUIInstanceLease> InstantiateAsync(
+        public UniTask<IUIInstanceLease> InstantiateAsync(
             UIResourceKey key,
             Transform parent = null,
             CancellationToken cancellationToken = default)
+            => InstantiateDiagnosticAsync(key, parent, cancellationToken, null, null, null);
+
+        internal async UniTask<IUIInstanceLease> InstantiateDiagnosticAsync(
+            UIResourceKey key, Transform parent, CancellationToken cancellationToken,
+            UIDiagnosticSpan parentSpan, BaseContext owner, UIScope scope)
         {
-            var lease = await AcquireAssetLeaseAsync(key, null, cancellationToken);
+            var lease = await AcquireAssetLeaseAsync(key, null, cancellationToken, parentSpan, owner, scope);
 
             GameObject instance;
             try
@@ -410,7 +426,18 @@ namespace YUIFramework
         private async UniTask<IUIAssetLease> AcquireAssetLeaseAsync(
             UIResourceKey key,
             Type expectedType,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            UIDiagnosticSpan parent = null, BaseContext owner = null, UIScope scope = null)
+        {
+            using var span = Diagnostics?.Begin("Load", owner, scope, parent?.Id ?? default,
+                resource: key.ToString(), token: cancellationToken);
+            try { return await AcquireAssetLeaseCoreAsync(key, expectedType, cancellationToken, span, owner, scope); }
+            catch (Exception exception) { span?.Fail(exception); throw; }
+        }
+
+        private async UniTask<IUIAssetLease> AcquireAssetLeaseCoreAsync(
+            UIResourceKey key, Type expectedType, CancellationToken cancellationToken,
+            UIDiagnosticSpan span, BaseContext owner, UIScope scope)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -453,7 +480,7 @@ namespace YUIFramework
             if (startedSource != null)
             {
                 // 在锁外发起底层加载，避免在持锁状态下调用外部代码。
-                RunLoadAsync(entry, provider, startedSource).Forget(Debug.LogException);
+                RunLoadAsync(entry, provider, startedSource, span, owner, scope).Forget(Debug.LogException);
             }
 
             LoadOutcome outcome;
@@ -489,7 +516,9 @@ namespace YUIFramework
                 {
                     entry.LeaseCount++;
                     entry.EverLeased = true;
-                    return new AssetLease(this, entry, outcome.Handle);
+                    return new AssetLease(this, entry, outcome.Handle,
+                        Diagnostics?.Begin("Lease", owner, scope, span?.Id ?? default,
+                            resource: normalized.ToString(), phase: "acquired"));
                 }
             }
 
@@ -520,8 +549,11 @@ namespace YUIFramework
         private async UniTask RunLoadAsync(
             Entry entry,
             IUIResourceProvider provider,
-            UniTaskCompletionSource<LoadOutcome> source)
+            UniTaskCompletionSource<LoadOutcome> source,
+            UIDiagnosticSpan parent, BaseContext owner, UIScope scope)
         {
+            using var span = Diagnostics?.Begin("NativeLoad", owner, scope, parent?.Id ?? default,
+                resource: entry.Key.ToString());
             IUINativeAssetHandle handle = null;
             Exception error = null;
 
@@ -532,6 +564,7 @@ namespace YUIFramework
             catch (Exception exception)
             {
                 error = exception;
+                span?.Fail(exception);
             }
 
             var releaseNow = false;
@@ -545,6 +578,8 @@ namespace YUIFramework
                 {
                     _nativeLoadCount++;
                 }
+                if (!succeeded && error == null)
+                    span?.Fail(new InvalidOperationException("The provider returned no valid native handle."));
 
                 if (succeeded && entry.WaiterCount == 0 && entry.LeaseCount == 0)
                 {
@@ -590,6 +625,7 @@ namespace YUIFramework
 
             // 共享任务永远以“成功”完成，错误随结果一起传递，
             // 因此即使没有任何等待者也不会产生未观察异常。
+            span?.Dispose();
             source.TrySetResult(new LoadOutcome(handle, error));
         }
 
@@ -849,13 +885,16 @@ namespace YUIFramework
             private readonly Entry _entry;
             private IUINativeAssetHandle _handle;
             private int _released;
+            private readonly UIDiagnosticSpan _diagnostic;
 
-            public AssetLease(UIResourceService service, Entry entry, IUINativeAssetHandle handle)
+            public AssetLease(UIResourceService service, Entry entry, IUINativeAssetHandle handle,
+                UIDiagnosticSpan diagnostic)
             {
                 _service = service;
                 _entry = entry;
                 _handle = handle;
                 Key = entry.Key;
+                _diagnostic = diagnostic;
             }
 
             public UIResourceKey Key { get; }
@@ -880,6 +919,8 @@ namespace YUIFramework
 
                 _handle = null;
                 _service.ReleaseLease(_entry);
+                _diagnostic?.Mark("released");
+                _diagnostic?.Dispose();
             }
 
             public void Dispose() => Release();

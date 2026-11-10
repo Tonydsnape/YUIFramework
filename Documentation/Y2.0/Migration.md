@@ -55,5 +55,11 @@ Do not destroy YooAsset packages while asset leases are still held.
 
 ## Terminology
 
+Scene/system-UI owners can migrate incrementally to `ui.Scopes` and independent
+Loading/Toast/confirmation services; see [SystemUI.md](SystemUI.md). Keep
+ReleaseScopeAsync(UIPoolScope) for idle-only pool governance, use
+UIScope.ReleaseAsync for active scene/module teardown, and await it before
+disposing scene-owned resources. Existing default opens/navigation stay Global.
+
 Use **resource bootstrap** or **resource update** for stage 6. `IBootstrapCodeLoader` is only
 an extension point. HybridCLR/code hot update is not installed or implemented in this stage.

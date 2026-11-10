@@ -1,0 +1,12 @@
+{
+  "family": "LXGW WenKai",
+  "style": "Regular; modern Kai-style reading face, not traditional handwritten calligraphy",
+  "version": "1.522",
+  "source": "https://github.com/lxgw/LxgwWenKai/releases/tag/v1.522",
+  "download": "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Regular.ttf",
+  "sha256": "39ad71264b588165b469e35e6afb162a378dacd1f95348160240ba9038ac3009",
+  "bytes": 25575676,
+  "license": "SIL Open Font License 1.1; see unchanged OFL.txt",
+  "copyright": "2021-2026 LXGW; 2020 The Klee Project Authors",
+  "distribution": "Bundled with this software under OFL; not sold by itself. Generated font atlases remain OFL."
+}

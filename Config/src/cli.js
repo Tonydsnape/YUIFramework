@@ -6,6 +6,8 @@ const { loadConfigurations, createArtifacts } = require('./exporter');
 const { commitDirectories } = require('./transaction');
 const { validateUISchema } = require('./ui-schema');
 const { generateCSharp } = require('./codegen');
+const { validateLocalizationSchema } = require('./localization-schema');
+const { validatePresentationSchema } = require('./presentation-schema');
 
 async function main(argv) {
   const options = { rootDir: path.resolve(__dirname, '..'), projectRoot: path.resolve(__dirname, '..', '..') };
@@ -37,7 +39,10 @@ async function main(argv) {
     const result = await exportClientPipeline(options);
     console.log(`Exported ${result.configurations.length} tables and typed bindings`);
   } else {
-    const artifacts = createArtifacts(await loadConfigurations(options.rootDir), 'server');
+    const configurations = await loadConfigurations(options.rootDir);
+    validateLocalizationSchema(configurations);
+    validatePresentationSchema(configurations);
+    const artifacts = createArtifacts(configurations, 'server');
     await commitDirectories(options.projectRoot, ['json', 'bytes'].map(kind => ({
       directory: path.join(options.out || 'Config/Server', kind),
       files: artifacts.map(a => ({ name: `${a.name}.${kind}`, content: a[kind] }))

@@ -29,10 +29,13 @@ namespace YUIFramework
 
         public UIOperationId Id { get; }
         public UIOperationKind Kind { get; }
+        internal UIDiagnosticSpan DiagnosticSpan { get; set; }
         public CancellationToken Token => _linkedCancellation?.Token ?? CancellationToken.None;
 
         public void Dispose()
         {
+            DiagnosticSpan?.Dispose();
+            DiagnosticSpan = null;
             var cancellation = Interlocked.Exchange(ref _linkedCancellation, null);
             cancellation?.Dispose();
             _owner.CompleteOperation(this);

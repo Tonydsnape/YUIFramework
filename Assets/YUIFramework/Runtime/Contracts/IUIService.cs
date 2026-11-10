@@ -11,6 +11,8 @@ namespace YUIFramework
         IUIMessageBus MessageBus { get; }
         UIRootRuntime RootRuntime { get; }
         UIInputLockService InputLocks { get; }
+        UIInputArbiter InputArbiter { get; }
+        UIScopeService Scopes { get; }
         UIPoolDiagnosticsSnapshot PoolDiagnostics { get; }
         UITransitionRunner Transitions { get; }
 

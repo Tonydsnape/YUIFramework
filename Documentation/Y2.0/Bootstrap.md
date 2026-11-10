@@ -6,6 +6,15 @@ publish hot-update code. Code loading is an optional boundary with no HybridCLR 
 
 ## Assembly boundary
 
+Stage 15 adds optional downstream `YUIFramework.CodeLoading` implementations of
+the existing `IBootstrapCodeLoader` / `IBootstrapGameEntry`. Verified asynchronous
+TextAsset leases, exact trusted identity/hash and explicit assembly-runtime
+injection connect ready resources to a public Hotfix entry. The stock IL2CPP
+byte-loader refuses execution; the named preloaded mock and real Mono DLL test
+are distinct. Bootstrap stays AOT and never references the Hotfix sample.
+See [HybridCLRBoundary.md](HybridCLRBoundary.md) for composition, irreversible
+load/constructor cancellation and future metadata responsibilities.
+
 ```text
 YUIFramework.Runtime
         |

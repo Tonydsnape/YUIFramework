@@ -11,7 +11,7 @@ namespace YUIFramework
     /// <summary>
     /// UI 核心调度器，负责注册、打开、关闭与生命周期驱动。
     /// </summary>
-    public class UIManager : IUIService
+    public partial class UIManager : IUIService
     {
         private static readonly Lazy<UIManager> LazyInstance = new Lazy<UIManager>(() => new UIManager());
 
@@ -65,6 +65,9 @@ namespace YUIFramework
         public UIInputRouter Input => _rootRuntime?.Input;
         public UIFocusService Focus => _rootRuntime?.Focus;
         public UIModalService Modals => _rootRuntime?.Modals;
+        public UIScopeService Scopes { get; private set; }
+        public UIInputArbiter InputArbiter => _rootRuntime?.InputArbiter;
+        public UIDiagnostics Diagnostics { get; }
         public int LastShutdownInputLockLeakCount { get; private set; }
         public UIPoolDiagnosticsSnapshot PoolDiagnostics =>
             _objectPool?.GetDiagnostics() ??
@@ -86,9 +89,10 @@ namespace YUIFramework
         IUINavigator IUIService.Navigator => Navigator;
         IUIMessageBus IUIService.MessageBus => MessageCenter;
 
-        public UIManager(IUITransitionClock transitionClock = null)
+        public UIManager(IUITransitionClock transitionClock = null, UIDiagnostics diagnostics = null)
         {
             _transitionClock = transitionClock;
+            Diagnostics = diagnostics;
         }
 
         [Obsolete("Use Initialize on an injected IUIService. UIManager.Init will be removed after the Y2 migration window.")]
@@ -190,6 +194,7 @@ namespace YUIFramework
             Application.lowMemory += OnApplicationLowMemory;
             SceneManager.sceneUnloaded += OnSceneUnloaded;
             _initialized = true;
+            Scopes = new UIScopeService(this);
         }
 
         public UniTask InitializeAsync(
@@ -226,6 +231,7 @@ namespace YUIFramework
         public void Register<T>(UIConfig config) where T : BaseContext
         {
             EnsureInitialized();
+            UIConfigRegistration.ValidateContextType(typeof(T));
 
             if (config == null)
             {
@@ -316,7 +322,7 @@ namespace YUIFramework
         {
             EnsureInitialized();
             EnsureAcceptingOperations();
-            if (!scene.IsValid())
+            if (!scene.IsValid() || !scene.isLoaded)
             {
                 throw new ArgumentException("A valid scene is required.", nameof(scene));
             }
@@ -546,7 +552,8 @@ namespace YUIFramework
         private UniTask<T> OpenCoordinatedAsync<T>(
             UIPoolScope scope,
             object args,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            UIOperationId diagnosticParent = default)
             where T : BaseContext
         {
             var contextType = typeof(T);
@@ -571,7 +578,7 @@ namespace YUIFramework
                     scope,
                     args,
                     markFirstCreation,
-                    ct),
+                    ct, diagnosticParent),
                 cancellationToken,
                 GetScopeServiceToken(scope));
         }
@@ -582,23 +589,34 @@ namespace YUIFramework
             UIPoolScope scope,
             object args,
             Action markFirstCreation,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            UIOperationId diagnosticParent)
             where T : BaseContext
         {
             if (_activeContexts.TryGetValue(contextType, out var cachedContext))
             {
                 if (ResolveContextScope(cachedContext) != scope)
                 {
-                    throw new InvalidOperationException(
-                        $"{contextType.Name} is already active in scope " +
-                        $"{ResolveContextScope(cachedContext)} and cannot be reopened in {scope}.");
+                    if (Scopes.IsEnding(ResolveContextScope(cachedContext)))
+                    {
+                        await CloseInternalAsync(cachedContext, CancellationToken.None, true);
+                        cancellationToken.ThrowIfCancellationRequested();
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException(
+                            $"{contextType.Name} is already active in scope " +
+                            $"{ResolveContextScope(cachedContext)} and cannot be reopened in {scope}.");
+                    }
                 }
-
-                return await OpenExistingAsync<T>(
-                    cachedContext,
-                    config,
-                    args,
-                    cancellationToken);
+                else
+                {
+                    return await OpenExistingAsync<T>(
+                        cachedContext,
+                        config,
+                        args,
+                        cancellationToken, diagnosticParent);
+                }
             }
 
             // 池化实例可能被框架外部销毁，这类条目会被对象池在 TryGet 时静默丢弃，
@@ -616,13 +634,13 @@ namespace YUIFramework
                     config,
                     scope,
                     args,
-                    cancellationToken);
+                    cancellationToken, diagnosticParent);
             }
 
             // Only a genuinely brand-new instantiation is eligible for single-flight
             // merging with a later equivalent concurrent Open request.
             markFirstCreation();
-            return await OpenNewAsync<T>(config, scope, args, cancellationToken);
+            return await OpenNewAsync<T>(config, scope, args, cancellationToken, diagnosticParent);
         }
 
         public async UniTask<UIHandle<T>> OpenHandleAsync<T>(
@@ -637,15 +655,16 @@ namespace YUIFramework
 
         internal async UniTask<T> OpenForNavigationAsync<T>(
             object args,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            UIPoolScope scope = default)
             where T : BaseContext
         {
             using (EnterNavigationCallbackType(typeof(T)))
             {
                 return await OpenCoordinatedAsync<T>(
-                    UIPoolScope.Global,
+                    NormalizeScope(scope),
                     args,
-                    cancellationToken);
+                    cancellationToken, Navigator.DiagnosticOperationId);
             }
         }
 
@@ -688,18 +707,19 @@ namespace YUIFramework
             Type contextType,
             BaseContext expectedContext,
             CancellationToken cancellationToken,
-            bool allowDuringShutdown = false)
+            bool allowDuringShutdown = false,
+            UIOperationId diagnosticParent = default)
         {
             if (expectedContext != null)
             {
                 // CloseInternalAsync re-validates identity against the active registry;
                 // a stale handle/reference is a no-op even if a newer instance of the
                 // same type is now active.
-                return CloseInternalAsync(expectedContext, cancellationToken, allowDuringShutdown);
+                return CloseInternalAsync(expectedContext, cancellationToken, allowDuringShutdown, diagnosticParent);
             }
 
             return _activeContexts.TryGetValue(contextType, out var activeContext)
-                ? CloseInternalAsync(activeContext, cancellationToken, allowDuringShutdown)
+                ? CloseInternalAsync(activeContext, cancellationToken, allowDuringShutdown, diagnosticParent)
                 : UniTask.CompletedTask;
         }
 
@@ -727,10 +747,11 @@ namespace YUIFramework
 
             using (EnterNavigationCallbackType(context.GetType()))
             {
+                var diagnosticParent = Navigator.DiagnosticOperationId;
                 await _coordinator.EnqueueAsync(
                     context.GetType(),
                     "Close",
-                    ct => CloseRoutedAsync(context.GetType(), context, ct, allowDuringShutdown),
+                    ct => CloseRoutedAsync(context.GetType(), context, ct, allowDuringShutdown, diagnosticParent),
                     cancellationToken);
             }
         }
@@ -738,7 +759,8 @@ namespace YUIFramework
         private async UniTask CloseInternalAsync(
             BaseContext ctx,
             CancellationToken cancellationToken,
-            bool allowDuringShutdown)
+            bool allowDuringShutdown,
+            UIOperationId diagnosticParent = default)
         {
             EnsureInitialized();
             cancellationToken.ThrowIfCancellationRequested();
@@ -762,7 +784,7 @@ namespace YUIFramework
                 ctx,
                 UIOperationKind.Close,
                 cancellationToken,
-                allowDuringShutdown);
+                allowDuringShutdown, diagnosticParent);
             var policy = config == null ? null : UIPoolPolicy.FromConfig(config);
             var intendsToPool =
                 policy != null &&
@@ -857,8 +879,9 @@ namespace YUIFramework
 
                 DestroyContextInternal(ctx, prefabKey);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException cancellation)
             {
+                operation.DiagnosticSpan?.Fail(cancellation);
                 throw;
             }
             catch (Exception exception)
@@ -939,8 +962,12 @@ namespace YUIFramework
                 _acceptingOperations = false;
             }
 
+            var errors = new List<Exception>();
+            try { _serviceLifetimeCancellation.Cancel(); }
+            catch (Exception exception) { AddFlattened(errors, exception); }
+            try { await Scopes.StopAsync(); }
+            catch (Exception exception) { AddFlattened(errors, exception); }
             Navigator?.Stop();
-            _serviceLifetimeCancellation.Cancel();
 
             if (Navigator != null)
             {
@@ -957,7 +984,6 @@ namespace YUIFramework
 
             await WaitForInFlightOperationsAsync();
 
-            var errors = new List<Exception>();
             var contexts = new List<BaseContext>(_activeContexts.Values);
             for (var i = contexts.Count - 1; i >= 0; i--)
             {
@@ -1054,6 +1080,7 @@ namespace YUIFramework
             _coordinator = null;
             Navigator = null;
             MessageCenter = null;
+            Scopes = null;
             _initialized = false;
             lock (_operationGate)
             {
@@ -1291,7 +1318,8 @@ namespace YUIFramework
         private UniTask HideCoreAsync(
             BaseContext ctx,
             CancellationToken cancellationToken,
-            bool allowDuringShutdown)
+            bool allowDuringShutdown,
+            UIOperationId diagnosticParent = default)
         {
             EnsureInitialized();
 
@@ -1304,7 +1332,7 @@ namespace YUIFramework
             return _coordinator.EnqueueAsync(
                 contextType,
                 "Hide",
-                ct => HideCoreExecuteAsync(ctx, ct, allowDuringShutdown),
+                ct => HideCoreExecuteAsync(ctx, ct, allowDuringShutdown, diagnosticParent),
                 cancellationToken);
         }
 
@@ -1319,7 +1347,7 @@ namespace YUIFramework
 
             using (EnterNavigationCallbackType(context.GetType()))
             {
-                await HideCoreAsync(context, cancellationToken);
+                await HideCoreAsync(context, cancellationToken, false, Navigator.DiagnosticOperationId);
             }
         }
 
@@ -1332,14 +1360,15 @@ namespace YUIFramework
 
             using (EnterNavigationCallbackType(context.GetType()))
             {
-                await HideCoreAsync(context, CancellationToken.None, true);
+                await HideCoreAsync(context, CancellationToken.None, true, Navigator.DiagnosticOperationId);
             }
         }
 
         private async UniTask HideCoreExecuteAsync(
             BaseContext ctx,
             CancellationToken cancellationToken,
-            bool allowDuringShutdown)
+            bool allowDuringShutdown,
+            UIOperationId diagnosticParent)
         {
             if (ctx.State == UIContextState.Hidden)
             {
@@ -1350,7 +1379,7 @@ namespace YUIFramework
                 ctx,
                 UIOperationKind.Hide,
                 cancellationToken,
-                allowDuringShutdown);
+                allowDuringShutdown, diagnosticParent);
             try
             {
                 ctx.TransitionTo(UIContextState.Hiding);
@@ -1367,8 +1396,9 @@ namespace YUIFramework
                 ctx.TransitionTo(UIContextState.Hidden);
                 HideContextRuntime(ctx);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException cancellation)
             {
+                operation.DiagnosticSpan?.Fail(cancellation);
                 NormalizeTransitionVisual(ctx);
                 ctx.CloseDisposition = UICloseDisposition.None;
                 if (ctx.State == UIContextState.Hiding)
@@ -1411,7 +1441,8 @@ namespace YUIFramework
             BaseContext ctx,
             object args,
             CancellationToken cancellationToken,
-            bool allowDuringShutdown)
+            bool allowDuringShutdown,
+            UIOperationId diagnosticParent = default)
         {
             EnsureInitialized();
 
@@ -1424,7 +1455,7 @@ namespace YUIFramework
             return _coordinator.EnqueueAsync(
                 contextType,
                 "Show",
-                ct => ShowCoreExecuteAsync(ctx, args, ct, allowDuringShutdown),
+                ct => ShowCoreExecuteAsync(ctx, args, ct, allowDuringShutdown, diagnosticParent),
                 cancellationToken);
         }
 
@@ -1440,7 +1471,7 @@ namespace YUIFramework
 
             using (EnterNavigationCallbackType(context.GetType()))
             {
-                await ShowCoreAsync(context, args, cancellationToken);
+                await ShowCoreAsync(context, args, cancellationToken, false, Navigator.DiagnosticOperationId);
             }
         }
 
@@ -1455,7 +1486,7 @@ namespace YUIFramework
 
             using (EnterNavigationCallbackType(context.GetType()))
             {
-                await ShowCoreAsync(context, args, CancellationToken.None, true);
+                await ShowCoreAsync(context, args, CancellationToken.None, true, Navigator.DiagnosticOperationId);
             }
         }
 
@@ -1463,7 +1494,8 @@ namespace YUIFramework
             BaseContext ctx,
             object args,
             CancellationToken cancellationToken,
-            bool allowDuringShutdown)
+            bool allowDuringShutdown,
+            UIOperationId diagnosticParent)
         {
             if (ctx.State == UIContextState.Opened)
             {
@@ -1474,7 +1506,7 @@ namespace YUIFramework
                 ctx,
                 UIOperationKind.Show,
                 cancellationToken,
-                allowDuringShutdown);
+                allowDuringShutdown, diagnosticParent);
             try
             {
                 ctx.TransitionTo(UIContextState.Opening);
@@ -1502,8 +1534,9 @@ namespace YUIFramework
                 ctx.TransitionTo(UIContextState.Opened);
                 ActivateContextRuntime(ctx);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException cancellation)
             {
+                operation.DiagnosticSpan?.Fail(cancellation);
                 DeactivateView(ctx);
                 HideContextRuntime(ctx);
                 if (ctx.State == UIContextState.Opening)
@@ -1549,7 +1582,8 @@ namespace YUIFramework
             BaseContext context,
             UIConfig config,
             object args,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            UIOperationId diagnosticParent = default)
             where T : BaseContext
         {
             if (context.View == null || context.ViewObject == null)
@@ -1570,7 +1604,7 @@ namespace YUIFramework
                 context,
                 UIOperationKind.Open,
                 cancellationToken,
-                false);
+                false, diagnosticParent);
             context.CloseDisposition = UICloseDisposition.None;
             context.TransitionTo(UIContextState.Opening);
             var previousSortingPosition = context.SortingLease == null
@@ -1603,6 +1637,7 @@ namespace YUIFramework
             }
             catch (OperationCanceledException cancellation)
             {
+                operation.DiagnosticSpan?.Fail(cancellation);
                 var rollbackError = TryRollbackExistingOpen(
                     context,
                     stableState,
@@ -1653,7 +1688,8 @@ namespace YUIFramework
             UIConfig config,
             UIPoolScope scope,
             object args,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            UIOperationId diagnosticParent)
             where T : BaseContext
         {
             var contextType = typeof(T);
@@ -1663,7 +1699,8 @@ namespace YUIFramework
                 context,
                 UIOperationKind.Open,
                 cancellationToken,
-                false);
+                false, diagnosticParent, scope);
+            operation.DiagnosticSpan?.Mark("PoolHit");
 
             try
             {
@@ -1682,6 +1719,7 @@ namespace YUIFramework
                 }
                 viewObject.SetActive(true);
                 context.BeginDisplayScope(args);
+                operation.DiagnosticSpan?.Mark("CachedShowStarted");
                 context.OnShow(args);
                 BlockUnderlyingInputDuringShow(context);
                 await PlayShowTransitionAsync(
@@ -1702,6 +1740,7 @@ namespace YUIFramework
             }
             catch (OperationCanceledException cancellation)
             {
+                operation.DiagnosticSpan?.Fail(cancellation);
                 var rollbackError = TryRollbackPooledOpen(
                     contextType,
                     context,
@@ -1750,7 +1789,7 @@ namespace YUIFramework
                 context,
                 UIOperationKind.Prewarm,
                 cancellationToken,
-                false);
+                false, diagnosticScope: scope);
 
             try
             {
@@ -1758,10 +1797,7 @@ namespace YUIFramework
                 GameObject instance;
                 if (_resourceService != null)
                 {
-                    var lease = await _resourceService.InstantiateAsync(
-                        UIResourceKey.Of<GameObject>(prefabKey, config.PrefabPackage),
-                        null,
-                        operation.Token);
+                    var lease = await InstantiateContextAsync(context, config, scope, operation.Token);
                     instance = lease.Instance;
                     if (instance == null)
                     {
@@ -1775,9 +1811,7 @@ namespace YUIFramework
                 }
                 else
                 {
-                    var prefab = await _resourceLoader.LoadPrefabAsync(
-                        prefabKey,
-                        operation.Token);
+                    var prefab = await LoadContextPrefabAsync(context, config, scope, operation.Token);
                     if (prefab == null)
                     {
                         throw new InvalidOperationException(
@@ -1829,6 +1863,7 @@ namespace YUIFramework
             }
             catch (Exception original)
             {
+                operation.DiagnosticSpan?.Fail(original);
                 if (entry != null)
                 {
                     _objectPool.Remove(entry);
@@ -1854,7 +1889,8 @@ namespace YUIFramework
             UIConfig config,
             UIPoolScope scope,
             object args,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            UIOperationId diagnosticParent = default)
             where T : BaseContext
         {
             var contextType = typeof(T);
@@ -1865,7 +1901,7 @@ namespace YUIFramework
                 context,
                 UIOperationKind.Open,
                 cancellationToken,
-                false);
+                false, diagnosticParent, scope);
 
             try
             {
@@ -1880,10 +1916,7 @@ namespace YUIFramework
                     IUIInstanceLease instanceLease;
                     try
                     {
-                        instanceLease = await _resourceService.InstantiateAsync(
-                            UIResourceKey.Of<GameObject>(prefabKey, config.PrefabPackage),
-                            null,
-                            operation.Token);
+                        instanceLease = await InstantiateContextAsync(context, config, scope, operation.Token);
                     }
                     catch (ResourceLoadException exception)
                     {
@@ -1932,9 +1965,7 @@ namespace YUIFramework
                     GameObject prefab;
                     try
                     {
-                        prefab = await _resourceLoader.LoadPrefabAsync(
-                            prefabKey,
-                            operation.Token);
+                        prefab = await LoadContextPrefabAsync(context, config, scope, operation.Token);
                     }
                     catch (ResourceLoadException exception)
                     {
@@ -2015,6 +2046,7 @@ namespace YUIFramework
             }
             catch (OperationCanceledException cancellation)
             {
+                operation.DiagnosticSpan?.Fail(cancellation);
                 var rollbackError = TryRollbackNewOpen(context);
                 var cleanupError = ReleaseContextInternal(
                     context,
@@ -2401,6 +2433,7 @@ namespace YUIFramework
                 errors.Add(exception);
             }
 
+            Diagnostics?.RecordDestroyed(context, this);
             _contextPrefabKeys.Remove(context);
             _contextScopes.Remove(context);
             if (errors.Count == 0)
@@ -2421,6 +2454,8 @@ namespace YUIFramework
             string phase,
             Exception exception)
         {
+            operation.DiagnosticSpan?.Mark(phase);
+            operation.DiagnosticSpan?.Fail(exception);
             return new UILifecycleException(
                 context.GetType(),
                 context.State,
@@ -2434,7 +2469,9 @@ namespace YUIFramework
             BaseContext context,
             UIOperationKind kind,
             CancellationToken cancellationToken,
-            bool allowDuringShutdown)
+            bool allowDuringShutdown,
+            UIOperationId diagnosticParent = default,
+            UIPoolScope? diagnosticScope = null)
         {
             CancellationToken serviceToken;
             lock (_operationGate)
@@ -2453,11 +2490,26 @@ namespace YUIFramework
 
             try
             {
-                return context.BeginOperation(
+                if (!allowDuringShutdown && Scopes != null &&
+                    Scopes.TryGetToken(ResolveContextScope(context), out var scopeToken))
+                    serviceToken = scopeToken;
+                var operation = context.BeginOperation(
                     kind,
                     cancellationToken,
                     serviceToken,
                     OnContextOperationDisposed);
+                _configRegistry.TryGetValue(context.GetType(), out var diagnosticConfig);
+                operation.DiagnosticSpan = Diagnostics?.Begin(kind.ToString(), context,
+                    Scopes.Find(diagnosticScope ?? ResolveContextScope(context)),
+                    diagnosticParent, resource: diagnosticConfig?.PrefabKey,
+                    token: operation.Token, id: operation.Id);
+                if (operation.DiagnosticSpan != null)
+                {
+                    // Normal release cancels LifetimeToken as cleanup, not as the operation's outcome.
+                    operation.DiagnosticSpan.InferTokenCancellation = false;
+                    context.DiagnosticScope = operation.DiagnosticSpan.Scope;
+                }
+                return operation;
             }
             catch
             {
@@ -2686,6 +2738,9 @@ namespace YUIFramework
 
             var type = context.GetType();
             _transitioningContexts[type] = context;
+            using var diagnostic = Diagnostics?.Begin("Transition", context,
+                Scopes.Find(ResolveContextScope(context)), operationId,
+                resource: config.PrefabKey, phase: "show", token: cancellationToken);
             try
             {
                 await _transitionRunner.PlayShowAsync(
@@ -2696,6 +2751,12 @@ namespace YUIFramework
                     type,
                     IsNavigationCallbackType(type),
                     cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                diagnostic?.Fail(exception);
+                context.DiagnosticOperation?.Fail(exception);
+                throw;
             }
             finally
             {
@@ -2723,6 +2784,9 @@ namespace YUIFramework
 
             var type = context.GetType();
             _transitioningContexts[type] = context;
+            using var diagnostic = Diagnostics?.Begin("Transition", context,
+                Scopes.Find(ResolveContextScope(context)), operationId,
+                resource: config.PrefabKey, phase: "hide", token: cancellationToken);
             try
             {
                 await _transitionRunner.PlayHideAsync(
@@ -2732,6 +2796,12 @@ namespace YUIFramework
                     type,
                     IsNavigationCallbackType(type),
                     cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                diagnostic?.Fail(exception);
+                context.DiagnosticOperation?.Fail(exception);
+                throw;
             }
             finally
             {
@@ -2963,6 +3033,10 @@ namespace YUIFramework
             }
 
             _sceneScopes.Remove(scene.handle);
+            if (Scopes.TryEndScene(scene.handle))
+            {
+                return;
+            }
             ReleaseScopeAsync(scope).Forget(Debug.LogException);
         }
 

@@ -9,12 +9,184 @@ using NUnit.Framework;
 using YUIFramework.Bootstrap;
 using YUIFramework.Configuration;
 using UnityEngine.TestTools;
+using YUIFramework.CodeLoading;
+using YUIFramework.Hotfix.Sample;
 
 namespace YUIFramework.Tests
 {
     public sealed class BootstrapRunnerEditModeTests
     {
         private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(10);
+
+        [UnityTest]
+        public IEnumerator Stage15_ActualMonoDllBytesAreCompiledImportedHashedLoadedAndInvoked() =>
+            AwaitTest(Stage15ActualDllAsync());
+
+        private async Task Stage15ActualDllAsync()
+        {
+            var name = "YUIStage15Dynamic" + Guid.NewGuid().ToString("N");
+            var folder = System.IO.Path.GetFullPath("Library/YUIFramework/" + name);
+            System.IO.Directory.CreateDirectory(folder);
+            var script = System.IO.Path.Combine(folder, "Entry.cs");
+            var dll = System.IO.Path.Combine(folder, name + ".dll");
+            var imported = "Assets/" + name + ".dll.bytes";
+            var source = @"using System.Threading;
+using Cysharp.Threading.Tasks;
+using YUIFramework;
+using YUIFramework.CodeLoading;
+namespace ExternalFixture {
+ public sealed class Page : BasePageContext { public Page() {} }
+ public sealed class Entry : IHotfixEntry {
+  public Entry() {}
+  public async UniTask<BaseContext> EnterAsync(IUIService ui, UIConfig page, CancellationToken token) {
+   ui.Register<Page>(page); return await ui.OpenAsync<Page>(cancellationToken: token);
+  }
+ }
+}";
+            System.IO.File.WriteAllText(script, source);
+            var builder = new UnityEditor.Compilation.AssemblyBuilder(dll, new[] { script })
+            {
+                additionalReferences = new[] { typeof(IUIService).Assembly.Location, typeof(IHotfixEntry).Assembly.Location,
+                    typeof(UniTask).Assembly.Location },
+                flags = UnityEditor.Compilation.AssemblyBuilderFlags.None
+            };
+            var compiled = new TaskCompletionSource<UnityEditor.Compilation.CompilerMessage[]>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            builder.buildFinished += (_, messages) => compiled.TrySetResult(messages);
+            var resources = new UIResourceService(); var ui = new UIManager();
+            using var views = new Stage15EditorViews();
+            try
+            {
+                Assert.IsTrue(builder.Build());
+                Assert.AreSame(compiled.Task, await Task.WhenAny(compiled.Task, Task.Delay(30000)), "External fixture compiler timeout.");
+                var errors = (await compiled.Task).Where(m => m.type == UnityEditor.Compilation.CompilerMessageType.Error).ToArray();
+                Assert.IsEmpty(errors, string.Join("\n", errors.Select(e => e.message)));
+                System.IO.File.WriteAllBytes(imported, System.IO.File.ReadAllBytes(dll));
+                UnityEditor.AssetDatabase.ImportAsset(imported, UnityEditor.ImportAssetOptions.ForceSynchronousImport);
+                var asset = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.TextAsset>(imported);
+                Assert.IsNotNull(asset, "Real binary TextAsset import.");
+                var identity = System.Reflection.AssemblyName.GetAssemblyName(dll).FullName;
+                Assert.IsFalse(AppDomain.CurrentDomain.GetAssemblies().Any(a => a.FullName == identity), "Not preloaded.");
+                using var sha = System.Security.Cryptography.SHA256.Create();
+                var provider = new Stage15CodeProvider(asset, null);
+                resources.Packages.Register(provider, true);
+                var spec = new HotfixAssemblySpec("DefaultPackage", imported, identity, "ExternalFixture.Entry",
+                    BitConverter.ToString(sha.ComputeHash(asset.bytes)).Replace("-", ""));
+                var code = new ResourceHotfixCodeLoader(spec, _ => resources, new MonoHotfixAssemblyRuntime());
+                var fixture = new Fixture();
+                fixture.CodeLoader.Handler = code.LoadAsync;
+                fixture.GameEntry.Handler = new HotfixGameEntry(code, _ => { ui.Initialize(views); return ui; },
+                    new UIConfig { Id = "ActualDll", PrefabKey = "ActualDll", Layer = UILayer.Normal }).EnterAsync;
+                try
+                {
+                    Assert.IsTrue((await fixture.Runner.RunAsync(CreateProfile())).IsSuccess);
+                    Assert.AreEqual(identity, code.LoadedAssembly.FullName);
+                    Assert.AreEqual("ExternalFixture.Entry", code.Entry.GetType().FullName);
+                    Assert.IsTrue(ui.IsInitialized);
+                    Assert.AreEqual(0, resources.GetDiagnostics().TotalLeases);
+                }
+                finally { await fixture.Runner.ShutdownAsync(); }
+                await ui.ShutdownAsync(); await resources.ShutdownAsync();
+                Assert.AreEqual(1, provider.Releases);
+            }
+            finally
+            {
+                if (ui.IsInitialized) await ui.ShutdownAsync();
+                await resources.ShutdownAsync();
+                UnityEditor.AssetDatabase.DeleteAsset(imported);
+                foreach (var path in System.IO.Directory.GetFiles(folder)) System.IO.File.Delete(path);
+                System.IO.Directory.Delete(folder);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator Stage15_VerifiedBootstrapResourceCodeExtensionPrecedesPublicBusinessEntry() =>
+            AwaitTest(Stage15BootstrapAsync());
+
+        private async Task Stage15BootstrapAsync()
+        {
+            foreach (var valid in new[] { true, false })
+            {
+                var order = new List<string>();
+                var fixture = new Fixture(order);
+                fixture.Backend.SetPlan("DefaultPackage", 1, 64);
+                var asset = new UnityEngine.TextAsset("named mock assembly payload");
+                var provider = new Stage15CodeProvider(asset, () =>
+                    Assert.AreEqual(1, fixture.Backend.VerifyCalls, "DLL resources cannot be read before verification."));
+                var resources = new UIResourceService(); resources.Packages.Register(provider, true);
+                using var sha = System.Security.Cryptography.SHA256.Create();
+                var hash = BitConverter.ToString(sha.ComputeHash(asset.bytes)).Replace("-", "");
+                var spec = new HotfixAssemblySpec("DefaultPackage", "code.dll.bytes", typeof(HotfixSampleEntry).Assembly.FullName,
+                    typeof(HotfixSampleEntry).FullName, valid ? hash : new string('0', 64));
+                var loader = new ResourceHotfixCodeLoader(spec, ready =>
+                {
+                    Assert.IsTrue(ready.Packages.All(p => p.IsManifestVerified));
+                    return resources;
+                }, new PreloadedHotfixAssemblyRuntime(typeof(HotfixSampleEntry).Assembly));
+                var ui = new UIManager(); using var views = new Stage15EditorViews();
+                var entry = new HotfixGameEntry(loader, _ =>
+                {
+                    Assert.IsNotNull(loader.Entry); ui.Initialize(views); return ui;
+                }, new UIConfig { Id = "HotfixBootstrap", PrefabKey = "HotfixBootstrap", Layer = UILayer.Normal });
+                fixture.CodeLoader.Handler = loader.LoadAsync;
+                fixture.GameEntry.Handler = entry.EnterAsync;
+                try
+                {
+                    var result = await fixture.Runner.RunAsync(CreateProfile());
+                    Assert.AreEqual(valid, result.IsSuccess);
+                    Assert.AreEqual(valid ? 1 : 0, fixture.GameEntry.CallCount);
+                    Assert.AreEqual(0, resources.GetDiagnostics().TotalLeases);
+                    Assert.AreEqual(valid ? 2 : 1, order.Count);
+                    if (valid)
+                    {
+                        Assert.IsInstanceOf<HotfixSamplePage>(entry.Page);
+                        Assert.AreEqual(UIContextState.Opened, entry.Page.State);
+                        var states = fixture.Telemetry.StateChanges;
+                        Assert.Less(states.IndexOf(BootstrapState.ResourcesReady), states.IndexOf(BootstrapState.LoadingCodeExtension));
+                        Assert.Less(states.IndexOf(BootstrapState.LoadingCodeExtension), states.IndexOf(BootstrapState.EnteringGame));
+                    }
+                    else Assert.AreEqual(BootstrapErrorCode.CodeLoadFailed, result.ErrorCode);
+                }
+                finally
+                {
+                    if (ui.IsInitialized) await ui.ShutdownAsync();
+                    await resources.ShutdownAsync(); await fixture.Runner.ShutdownAsync();
+                    UnityEngine.Object.DestroyImmediate(asset);
+                }
+                Assert.AreEqual(1, provider.Releases);
+            }
+        }
+
+        private sealed class Stage15EditorViews : IResourceLoader, IDisposable
+        {
+            private readonly CodeViewLoader _templates = new CodeViewLoader();
+            public UniTask<UnityEngine.GameObject> LoadPrefabAsync(string key, CancellationToken token = default) =>
+                _templates.LoadPrefabAsync(key, token);
+            public void Release(string key, UnityEngine.GameObject instance) => UnityEngine.Object.DestroyImmediate(instance);
+            public void Dispose() => _templates.Dispose();
+        }
+        private sealed class Stage15CodeProvider : IUIResourceProvider
+        {
+            private readonly UnityEngine.TextAsset _asset;
+            private readonly Action _onLoad;
+            public int Releases { get; private set; }
+            public Stage15CodeProvider(UnityEngine.TextAsset asset, Action onLoad) { _asset = asset; _onLoad = onLoad; }
+            public string PackageName => "DefaultPackage";
+            public UniTask<IUINativeAssetHandle> LoadAssetAsync(UIResourceKey key)
+            {
+                _onLoad?.Invoke();
+                return UniTask.FromResult<IUINativeAssetHandle>(new Stage15CodeHandle(_asset, () => Releases++));
+            }
+            public UniTask ShutdownAsync() => UniTask.CompletedTask;
+        }
+        private sealed class Stage15CodeHandle : IUINativeAssetHandle
+        {
+            public UnityEngine.Object Asset { get; private set; }
+            public bool IsValid => Asset;
+            private readonly Action _release;
+            public Stage15CodeHandle(UnityEngine.Object asset, Action release) { Asset = asset; _release = release; }
+            public void Release() { if (Asset) { Asset = null; _release(); } }
+        }
 
         [UnityTest]
         public IEnumerator ConfigIntegration_VerifiedBootstrapRegistersBeforeBusinessAndStopsOnConfigFailure() =>
@@ -1452,6 +1624,7 @@ namespace YUIFramework.Tests
             public Exception Failure { get; set; }
             public int CallCount { get; private set; }
             public bool Block { get; set; }
+            public Func<BootstrapReadyContext, CancellationToken, UniTask> Handler { get; set; }
 
             public async UniTask LoadAsync(
                 BootstrapReadyContext context,
@@ -1460,6 +1633,7 @@ namespace YUIFramework.Tests
                 cancellationToken.ThrowIfCancellationRequested();
                 CallCount++;
                 _order?.Add("code");
+                if (Handler != null) await Handler(context, cancellationToken);
                 if (Failure != null)
                 {
                     throw Failure;

@@ -41,6 +41,13 @@ namespace YUIFramework
                 case "y2":
                     registrations.Add(UIConfigRegistration.For<SampleHelloPage>(Take(configs, "SampleHelloPage")));
                     break;
+                case "system":
+                    registrations.Add(UIConfigRegistration.For<SystemUISamplePage>(Take(configs, "SystemUISamplePage")));
+                    registrations.Add(UIConfigRegistration.For<SampleLoadingContext>(Take(configs, "SystemLoading")));
+                    registrations.Add(UIConfigRegistration.For<SampleToastContext>(Take(configs, "SystemToast")));
+                    registrations.Add(UIConfigRegistration.For<SampleConfirmationContext>(Take(configs, "SystemConfirmation")));
+                    registrations.Add(UIConfigRegistration.For<SampleSystemContext>(Take(configs, "SystemNotice")));
+                    break;
                 default: throw new ConfigDataException($"Unknown UI profile: {profile}");
             }
             if (configs.Count != 0) throw new ConfigDataException("UI table has records without an explicit typed mapping.");
@@ -73,13 +80,14 @@ namespace YUIFramework
     {
         private readonly UIResourceService _resources = null;
         public ConfigService Service { get; }
+        public IUIResourceService SampleResources => _resources;
         public SampleConfigOwner()
         {
+            _resources = new UIResourceService();
+            _resources.Packages.Register(new ResourcesResourceProvider(), true);
 #if UNITY_EDITOR
             Service = SampleUIConfiguration.Create(new EditorJsonConfigSource(), ConfigFormat.Json);
 #else
-            _resources = new UIResourceService();
-            _resources.Packages.Register(new ResourcesResourceProvider(), true);
             Service = SampleUIConfiguration.Create(
                 new ResourceConfigSource(_resources, prefix: "YUIConfig/"), ConfigFormat.MessagePack);
 #endif

@@ -1,0 +1,8 @@
+{
+  "name": "YUIFramework.Game.Tests.PlayMode",
+  "references": ["YUIFramework.Game", "YUIFramework.Game.Editor", "YUIFramework.Runtime", "UniTask", "Unity.ugui", "Unity.TextMeshPro"],
+  "includePlatforms": [],
+  "defineConstraints": ["UNITY_EDITOR"],
+  "autoReferenced": false,
+  "optionalUnityReferences": ["TestAssemblies"]
+}

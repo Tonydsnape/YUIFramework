@@ -2,9 +2,22 @@
   "name": "YUIFramework.Editor",
   "rootNamespace": "YUIFramework.Editor",
   "references": [
+    "YUIFramework.CodeLoading",
+    "YUIFramework.Hotfix.AotSample",
     "YUIFramework.Runtime",
     "YUIFramework.Bootstrap",
-    "YUIFramework.HotUpdate"
+    "YUIFramework.HotUpdate",
+    "YUIFramework.Config",
+    "YUIFramework.Config.Editor",
+    "YUIFramework.Localization",
+    "YUIFramework.Localization.Editor",
+    "YUIFramework.Examples",
+    "Unity.Newtonsoft.Json",
+    "Unity.TextMeshPro",
+    "Unity.ugui",
+    "UniTask",
+    "YooAsset",
+    "YooAsset.Editor"
   ],
   "includePlatforms": [
     "Editor"

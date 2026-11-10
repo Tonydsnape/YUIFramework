@@ -17,6 +17,27 @@ namespace YUIFramework
             new Dictionary<string, IUITransition>(StringComparer.Ordinal);
         private readonly IUITransitionClock _clock;
         private bool _disposed;
+        public bool ReducedMotion { get; private set; }
+        public bool IsDisposed => _disposed;
+        public IReadOnlyList<UITransitionDiagnosticSnapshot> GetDiagnostics()
+        {
+            var snapshots = new List<UITransitionDiagnosticSnapshot>();
+            foreach (var state in _targets.Values)
+                if (state.Active != null)
+                    snapshots.Add(new UITransitionDiagnosticSnapshot(state.Target == null ? "(destroyed)" : state.Target.name,
+                        state.Target == null ? 0 : state.Target.GetInstanceID(), state.Active.OperationId,
+                        state.Generation, state.Active.IsReversing));
+            return snapshots.AsReadOnly();
+        }
+        public void SetReducedMotion(bool enabled)
+        {
+            ThrowIfDisposed();
+            ReducedMotion = enabled;
+            if (!enabled) return;
+            var targets = new List<TargetState>(_targets.Values);
+            foreach (var state in targets)
+                if (state.Active != null) RequestInterruption(state.Target, UITransitionInterruption.SkipToEnd);
+        }
 
         public UITransitionRunner(IUITransitionClock clock = null)
         {
@@ -252,6 +273,11 @@ namespace YUIFramework
             }
 
             EnsureBaseline(state);
+            if (ReducedMotion)
+            {
+                Apply(state, isShow ? state.Baseline : ResolveRollback(state, settings, UITransitionRollbackState.Hidden), state.Generation);
+                return;
+            }
             var generation = ++state.Generation;
             var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             var session = new TransitionSession(operationId, linked)

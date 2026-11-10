@@ -9,6 +9,11 @@ namespace YUIFramework
         bool BackPressedThisFrame { get; }
     }
 
+    public interface IUIBackHandler
+    {
+        bool TryHandleBack();
+    }
+
     public sealed class LegacyUIBackInputSource : IUIBackInputSource
     {
         public bool BackPressedThisFrame => Input.GetKeyDown(KeyCode.Escape);
@@ -22,6 +27,7 @@ namespace YUIFramework
     {
         private IUINavigator _navigator;
         private UIInputLockService _inputLocks;
+        private UIModalService _modals;
         private IUIBackInputSource _source;
         private bool _backInFlight;
         private bool _disposed;
@@ -33,7 +39,8 @@ namespace YUIFramework
         public void Bind(
             IUINavigator navigator,
             UIInputLockService inputLocks,
-            IUIBackInputSource source = null)
+            IUIBackInputSource source = null,
+            UIModalService modals = null)
         {
             if (_disposed)
             {
@@ -42,6 +49,7 @@ namespace YUIFramework
 
             _navigator = navigator ?? throw new ArgumentNullException(nameof(navigator));
             _inputLocks = inputLocks ?? throw new ArgumentNullException(nameof(inputLocks));
+            _modals = modals;
             _source = source ?? new LegacyUIBackInputSource();
         }
 
@@ -62,10 +70,15 @@ namespace YUIFramework
                 return false;
             }
 
-            if (_backInFlight || _navigator.IsBusy || _inputLocks.IsLocked)
+            if (_backInFlight || _inputLocks.IsLocked)
             {
                 return false;
             }
+
+            var modal = _modals?.Top;
+            if (modal != null)
+                return modal is IUIBackHandler handler && handler.TryHandleBack();
+            if (_navigator.IsBusy) return false;
 
             _backInFlight = true;
             NavigateBackAsync().Forget(Debug.LogException);
@@ -77,6 +90,7 @@ namespace YUIFramework
             _disposed = true;
             _navigator = null;
             _inputLocks = null;
+            _modals = null;
             _source = null;
         }
 

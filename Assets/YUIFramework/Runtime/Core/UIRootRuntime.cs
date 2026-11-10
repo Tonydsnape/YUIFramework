@@ -11,6 +11,8 @@ namespace YUIFramework
         public RenderMode RenderMode { get; set; } = RenderMode.ScreenSpaceOverlay;
         public Camera EventCamera { get; set; }
         public bool DontDestroyOnLoad { get; set; } = true;
+        public UIScalePolicy ScalePolicy { get; set; } = UIScalePolicy.Default;
+        public IUIScreenSource ScreenSource { get; set; }
     }
 
     /// <summary>
@@ -39,13 +41,16 @@ namespace YUIFramework
             Root.Claim(this);
             try
             {
-                Root.Configure(LayerProfile, Options.RenderMode, Options.EventCamera);
+                Root.Configure(LayerProfile, Options.RenderMode, Options.EventCamera, Options.ScalePolicy);
+                ScreenLayout = Root.gameObject.AddComponent<UIScreenLayout>();
+                ScreenLayout.Initialize(Root.GetComponent<Canvas>(), Options.ScreenSource);
                 LayerManager = new UILayerManager(Root, LayerProfile);
                 Focus = new UIFocusService(EventSystem);
                 Interaction = new UIInteractionController(LayerManager, LayerProfile, Focus);
                 InputLocks = new UIInputLockService(LayerProfile, Interaction);
                 Modals = new UIModalService(Root, LayerManager, Interaction);
                 Interaction.Bind(InputLocks, Modals);
+                InputArbiter = new UIInputArbiter(this);
                 Input = new UIInputRouter();
                 _inputDriver = Root.gameObject.AddComponent<UIInputDriver>();
                 _inputDriver.Bind(Input, EventSystem);
@@ -69,6 +74,8 @@ namespace YUIFramework
         public UIFocusService Focus { get; }
         public UIModalService Modals { get; }
         public UIInputRouter Input { get; }
+        public UIInputArbiter InputArbiter { get; }
+        public UIScreenLayout ScreenLayout { get; }
         public bool IsDisposed => _disposed;
 
         public static UIRootRuntime CreateOwned(UIRootRuntimeOptions options = null)
@@ -172,7 +179,7 @@ namespace YUIFramework
         public void BindNavigator(IUINavigator navigator)
         {
             ThrowIfDisposed();
-            Input.Bind(navigator, InputLocks);
+            Input.Bind(navigator, InputLocks, modals: Modals);
         }
 
         public void Dispose()
@@ -184,6 +191,7 @@ namespace YUIFramework
 
             _disposed = true;
             Input?.Dispose();
+            if (ScreenLayout != null) { ScreenLayout.enabled = false; DestroyObject(ScreenLayout); }
             if (_inputDriver != null)
             {
                 DestroyObject(_inputDriver);
