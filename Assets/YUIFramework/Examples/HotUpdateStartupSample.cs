@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using YUIFramework.Bootstrap;
@@ -28,12 +29,12 @@ namespace YUIFramework
         private ConfigService _configs;
         private TextLocalizationService _localization;
         private UIPresentationService _presentation;
-        private UniTask _runTask;
+        private Task _runTask = Task.CompletedTask;
 
         private void Start()
         {
-            _runTask = RunAsync(destroyCancellationToken).Preserve();
-            _runTask.Forget(HandleException);
+            _runTask = RunAsync(destroyCancellationToken).AsTask();
+            _runTask.AsUniTask().Forget(HandleException);
         }
 
         private void OnDestroy()

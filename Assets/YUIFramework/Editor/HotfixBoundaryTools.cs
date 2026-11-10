@@ -8,12 +8,14 @@ using UnityEditor.Compilation;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using YUIFramework.CodeLoading;
-using YUIFramework.Hotfix.AotSample;
 
 namespace YUIFramework.Editor
 {
     public static class HotfixBoundaryTools
     {
+        private static Type SampleType() => Type.GetType(
+            "YUIFramework.Hotfix.AotSample.HotfixBoundarySample, YUIFramework.Hotfix.AotSample", false) ??
+            throw new InvalidOperationException("Import the Complete UI flow sample before using Hotfix sample tools.");
         [MenuItem("Tools/YUIFramework/Stage 15/Export boundary and metadata draft")]
         public static void ExportDraft()
         {
@@ -119,7 +121,7 @@ namespace YUIFramework.Editor
             if (File.Exists(path)) throw new InvalidOperationException("Existing sample scene is never overwritten.");
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            new GameObject("AOT Hotfix boundary sample", typeof(HotfixBoundarySample));
+            new GameObject("AOT Hotfix boundary sample", SampleType());
             if (!EditorSceneManager.SaveScene(scene, path)) throw new IOException("Could not save sample scene.");
         }
 
@@ -159,12 +161,16 @@ namespace YUIFramework.Editor
             try
             {
                 scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-                var host = new GameObject("AOT Hotfix boundary sample", typeof(HotfixBoundarySample));
+                var host = new GameObject("AOT Hotfix boundary sample", SampleType());
                 UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(host, scene);
                 if (!EditorSceneManager.SaveScene(scene, scenePath)) throw new IOException("Could not save probe scene.");
                 profile = ScriptableObject.CreateInstance<UIBuildProfile>();
                 profile.hideFlags = HideFlags.HideAndDontSave;
                 profile.Policy = UIBuildPolicy.MinimalDemo; profile.Target = target;
+                var jsonRoot = YUIFramework.Configuration.EditorJsonConfigSource.FindSampleRoot();
+                profile.UISettingsJson = jsonRoot + "UISettings.json";
+                profile.LocalizationJson = jsonRoot + "LocalizationTextConfig.json";
+                profile.PresentationJson = jsonRoot + "UIPresentationConfig.json";
                 profile.Scenes = new[] { AssetDatabase.LoadAssetAtPath<SceneAsset>(scenePath) };
                 profile.CheckTextContent = false;
                 profile.AuditedDemoResourcePaths = AssetDatabase.GetAllAssetPaths().Where(p => p.StartsWith("Assets/") &&

@@ -24,6 +24,14 @@ namespace YUIFramework.Localization.Editor
             foreach (var label in root.GetComponentsInChildren<ConfigLocalizedText>(true))
                 if (catalog == null || !catalog.TryGet(label.TextKey.Key, out _))
                     issues.Add(new UIContentIssue(label, "MissingKey", $"Unknown localization key '{label.TextKey.Key}'."));
+            var originals = root.GetComponentsInChildren<TMP_Text>(true);
+            if (originals.Length == 0) return issues;
+            if (!TMP_Settings.instance)
+            {
+                issues.Add(new UIContentIssue(originals[0], "MissingTMPSettings",
+                    "Import/configure TMP Essential Resources before validating TMP text. No source defaults are created by this check."));
+                return issues;
+            }
             using var fonts = new TransientTMPFonts();
             using var settings = fonts.UseSettings();
             var holder = new GameObject("Transient content check", typeof(RectTransform), typeof(Canvas));
@@ -38,7 +46,6 @@ namespace YUIFramework.Localization.Editor
                 foreach (var canvas in clone.GetComponentsInChildren<Canvas>(true)) canvas.renderMode = RenderMode.WorldSpace;
                 foreach (var behaviour in clone.GetComponentsInChildren<MonoBehaviour>(true))
                     if (!(behaviour is UnityEngine.EventSystems.UIBehaviour)) behaviour.enabled = false;
-                var originals = root.GetComponentsInChildren<TMP_Text>(true);
                 var copies = clone.GetComponentsInChildren<TMP_Text>(true);
                 foreach (var text in copies) fonts.Apply(text);
                 holder.SetActive(true);

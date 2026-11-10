@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace YUIFramework.HotUpdate
 {
-    [Obsolete("Inject IBootstrapTelemetrySink into BootstrapRunner.")]
+    [Obsolete("Inject IBootstrapTelemetrySink into BootstrapRunner. Scheduled removal: 2.1.0.")]
     public static class StartupFlowTrace
     {
         public static void Begin(string detail) => Write("BEGIN", "bootstrap", detail);

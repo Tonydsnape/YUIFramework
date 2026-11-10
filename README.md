@@ -11,10 +11,15 @@ YUIFramework 是一个面向 **Unity uGUI** 的可扩展 UI 框架，当前仓�
 
 ## Y2.0 改造基线
 
-Y2.0 正在按阶段建立商用基线。阶段 0 到阶段 15 已完成，阶段 16 未开始：包含资源 Bootstrap、池治理、可取消转场、消息/MVVM、商业虚拟列表、Excel 配置、安全区、本地化与主题、场景与系统 UI、运行时诊断与目标设备性能预算、Editor 页面生成/预览/构建门禁，以及独立 Hotfix.Sample 与 AOT 代码加载边界。阶段 15 已实际执行 Android ARM64 IL2CPP High 裁剪构建及产物检查，另以真正裁剪后的 Mono Player 验证反射入口；未安装 HybridCLR、未发布热更 DLL、未声称真机热更通过。中文基础字体实际使用 OFL 授权的霞鹜文楷 Regular。
+Y2.0 正在按阶段建立商用基线。阶段 0 到阶段 15 已完成，阶段 16 本机实现和可执行门禁已交付待验收：包含单源可复现 UPM 导出、干净消费工程与真实样例 Import、完整 UI 流程、迁移文档、完整回归及 Android ARM64 IL2CPP High 构建。最新设备安装成功，但应用进入 Unity 前暂停且无有效报告，Android 真机 UI 门禁尚未通过；iOS 原生构建/真机仍缺 macOS/Xcode/设备条件，完整 RC 未认证。此前资源 Bootstrap、池治理、可取消转场、消息/MVVM、商业虚拟列表、Excel 配置、安全区、本地化与主题、场景与系统 UI、诊断和 Editor 门禁契约保持。未安装 HybridCLR、未发布热更 DLL、未声称真机热更或移动性能通过。
 
 - 基线说明：[`Documentation/Y2.0/Baseline.md`](Documentation/Y2.0/Baseline.md)
 - 分阶段路线：[`Documentation/Y2.0/Roadmap.md`](Documentation/Y2.0/Roadmap.md)
+- 框架结构图谱、模块代码位置与调用链：[`Documentation/Y2.0/ArchitectureMap.md`](Documentation/Y2.0/ArchitectureMap.md)
+- UPM 新工程接入、真实样例导入与 CI：[`Documentation/Y2.0/PackageQuickstart.md`](Documentation/Y2.0/PackageQuickstart.md)
+- 公开 API 使用与所有权索引：[`Documentation/Y2.0/PublicAPI.md`](Documentation/Y2.0/PublicAPI.md)
+- RC 原始门禁及未验证边界：[`Documentation/Y2.0/ReleaseCandidate.md`](Documentation/Y2.0/ReleaseCandidate.md)
+- 排错手册：[`Documentation/Y2.0/Troubleshooting.md`](Documentation/Y2.0/Troubleshooting.md)
 - API 迁移矩阵：[`Documentation/Y2.0/ApiMigrationMatrix.md`](Documentation/Y2.0/ApiMigrationMatrix.md)
 - Y2 运行时契约：[`Documentation/Y2.0/Contracts.md`](Documentation/Y2.0/Contracts.md)
 - 资源所有权体系：[`Documentation/Y2.0/Resources.md`](Documentation/Y2.0/Resources.md)
@@ -60,43 +65,44 @@ Y2.0 正在按阶段建立商用基线。阶段 0 到阶段 15 已完成，阶�
 
 ## 架构总览
 
-```text
-+--------------------------+
-|        UIManager         |
-| Init/Register/Open/Close |
-+-----------+--------------+
-            |
-            v
-+--------------------------+      +---------------------+
-|      UILayerManager      |----->|      UIRoot         |
-| layer root/sorting order |      | Canvas + EventSystem|
-+-----------+--------------+      +----------+----------+
-            |                                |
-            v                                v
-+--------------------------+      +---------------------+
-|        BaseContext       |<---->|       UIView        |
-| lifecycle + state        |      | GameObject bridge   |
-+-----------+--------------+      +---------------------+
-            |
-            v
-+--------------------------+
-|      IResourceLoader     |
-| ResourcesLoader (P1)     |
-+--------------------------+
+下图是当前功能协作关系；程序集引用、完整模块文件索引、打开/关闭时序与配置链路见
+[框架结构图谱](Documentation/Y2.0/ArchitectureMap.md)。
+
+```mermaid
+flowchart TD
+    App["应用组合根"] --> Boot["BootstrapRunner / YooAsset 适配"]
+    App --> Config["ConfigService / 显式类型映射"]
+    App --> UI["UIManager / IUIService"]
+    Boot --> Res["UIResourceService / 独立租约"]
+    Config --> UI
+    UI --> Nav["UINavigator / FIFO 事务"]
+    Nav --> Context["类型队列 → BaseContext + UIView"]
+    UI --> Context
+    UI --> Root["UIRootRuntime / 层级 / 输入 / 模态 / 焦点"]
+    UI --> Pool["UIObjectPool / 预热与复用"]
+    UI --> Res
+    Context --> Data["消息 / MVVM / 本地化 / 主题"]
+    System["Scope / Loading / Toast / 确认框"] --> UI
+    Diag["可选诊断与性能采样"] -.-> UI
 ```
 
 ## 分层说明
 
 | 层级 | sortingOrder | 用途 |
 |---|---:|---|
-| Scene | 0 | 场景内 UI（预留） |
-| Bottom | 100 | 底层 UI |
-| Normal | 200 | 普通全屏页面（后续导航栈主工作层） |
-| Fixed | 300 | 常驻 HUD / 固定挂件 |
-| Popup | 400 | 弹窗层 |
-| Guide | 500 | 引导层 |
-| Top | 600 | 高优先级覆盖层 |
-| System | 700 | Loading / 断线重连等系统层 |
+| Background | 0 | 背景；旧 Bottom 别名 |
+| Scene | 1000 | 场景内 UI |
+| Normal | 2000 | 普通页面 |
+| Fixed | 3000 | 常驻 HUD / 固定挂件 |
+| Popup | 4000 | 弹窗，默认模态 |
+| Guide | 5000 | 引导 |
+| Toast | 6000 | 提示；旧 Top 别名 |
+| Loading | 7000 | 加载覆盖层，默认模态 |
+| System | 8000 | 系统通知，默认模态 |
+| Debug | 9000 | 调试覆盖层 |
+
+这里列出 `UILayerProfile.CreateDefault()` 的 sorting base；具体实例由排序租约分配，
+不是同层所有 Canvas 共用一个固定 sortingOrder。
 
 ## 生命周期
 
@@ -172,7 +178,7 @@ WenKai TMP 字体，文本及布局保存在预制体内且不拦截射线。支
 2. 在场景中创建空物体，挂载 `HelloUIBootstrap`。
 3. 运行后先加载生成的配置表，再按显式 Context 映射批量注册并打开页面。
 
-现有 3 个启动入口、6 条 UI 注册已全部迁移，参数保持各自 profile 原值。
+原有启动 profile 与阶段 12 system profile 的 11 条 UI 注册已迁移，参数保持各自 profile 原值。
 维护 `Config/UISettings.xlsx` 后重新导出即可；加载失败不会回退到手写注册。
 完整所有权/清理示例见 `Examples/HelloUIBootstrap.cs`，核心链路如下：
 
@@ -527,4 +533,4 @@ static 配置。`Examples/HotUpdateStartupSample.cs` 因保留旧 MonoScript 引
 
 ---
 
-当前仓库已落地 P1 ~ P9；Y2.0 阶段 0 ~ 12 已完成，阶段 13 尚未开始。
+当前仓库已落地 P1 ~ P9；Y2.0 阶段 0 ~ 15 已完成，阶段 16 本机交付与未通过的移动端 RC 门禁见路线图及验收清单。

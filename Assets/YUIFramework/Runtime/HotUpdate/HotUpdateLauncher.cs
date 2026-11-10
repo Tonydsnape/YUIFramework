@@ -6,7 +6,7 @@ using YUIFramework.Bootstrap;
 
 namespace YUIFramework.HotUpdate
 {
-    [Obsolete("Use an injected BootstrapRunner instance.")]
+    [Obsolete("Use an injected BootstrapRunner instance. Scheduled removal: 2.1.0.")]
     public static class HotUpdateLauncher
     {
         private static Action<float> _progress;

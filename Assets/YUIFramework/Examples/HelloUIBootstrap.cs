@@ -23,13 +23,14 @@ namespace YUIFramework
         {
             _uiService = new UIManager();
             var configOwner = new SampleConfigOwner();
+            using var views = new CodeViewLoader();
             using var localization = new TextLocalizationService(configOwner.Service, "en");
             UIPresentationService presentation = null;
             try
             {
                 var rootRuntime = UIRootRuntime.CreateOwned();
                 await _uiService.InitializeAsync(
-                    new CodeViewLoader(),
+                    views,
                     rootRuntime,
                     cancellationToken: cancellationToken);
                 presentation = new UIPresentationService(configOwner.Service, localization, configOwner.SampleResources, _uiService.Transitions);

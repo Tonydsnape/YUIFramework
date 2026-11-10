@@ -131,7 +131,7 @@ namespace YUIFramework
             return channel.Count;
         }
 
-        [Obsolete("Use Subscribe(UIMessageTopic<UIMessageUnit>, ...). String message APIs will be removed after the Y2 migration window.")]
+        [Obsolete("Use Subscribe(UIMessageTopic<UIMessageUnit>, ...). Scheduled removal: 2.1.0.")]
         public UIMessageToken Subscribe(string messageName, Action handler, object owner = null)
         {
             if (handler == null)
@@ -145,7 +145,7 @@ namespace YUIFramework
                 owner: owner);
         }
 
-        [Obsolete("Use Subscribe(UIMessageTopic<T>, ...). String message APIs will be removed after the Y2 migration window.")]
+        [Obsolete("Use Subscribe(UIMessageTopic<T>, ...). Scheduled removal: 2.1.0.")]
         public UIMessageToken Subscribe<T>(
             string messageName,
             Action<T> handler,
@@ -157,7 +157,7 @@ namespace YUIFramework
                 owner: owner);
         }
 
-        [Obsolete("Use Publish(UIMessageTopic<UIMessageUnit>, UIMessageUnit.Value). String message APIs will be removed after the Y2 migration window.")]
+        [Obsolete("Use Publish(UIMessageTopic<UIMessageUnit>, UIMessageUnit.Value). Scheduled removal: 2.1.0.")]
         public void Publish(string messageName)
         {
             Publish(
@@ -165,7 +165,7 @@ namespace YUIFramework
                 UIMessageUnit.Value);
         }
 
-        [Obsolete("Use Publish(UIMessageTopic<T>, payload). String message APIs will be removed after the Y2 migration window.")]
+        [Obsolete("Use Publish(UIMessageTopic<T>, payload). Scheduled removal: 2.1.0.")]
         public void Publish<T>(string messageName, T payload)
         {
             Publish(new UIMessageTopic<T>(messageName), payload);
@@ -206,7 +206,7 @@ namespace YUIFramework
             _channels.Clear();
         }
 
-        [Obsolete("Use Count(UIMessageTopic<T>). String message APIs will be removed after the Y2 migration window.")]
+        [Obsolete("Use Count(UIMessageTopic<T>). Scheduled removal: 2.1.0.")]
         public int Count(string messageName)
         {
             EnsureOwningThread();

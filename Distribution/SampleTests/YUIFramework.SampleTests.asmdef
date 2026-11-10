@@ -1,0 +1,5 @@
+{
+  "name": "YUIFramework.SampleTests",
+  "references": ["YUIFramework.Runtime", "YUIFramework.Examples", "YUIFramework.Config", "YUIFramework.Localization", "UniTask", "Unity.TextMeshPro"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

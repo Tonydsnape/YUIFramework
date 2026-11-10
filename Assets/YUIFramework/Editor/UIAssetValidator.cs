@@ -184,7 +184,7 @@ namespace YUIFramework.Editor
                 UISettings table;
                 try { table = configs.InitializeAsync().GetAwaiter().GetResult().Get(UISettings.Table); }
                 finally { configs.ShutdownAsync().GetAwaiter().GetResult(); }
-                foreach (var row in table.Values) UIConfigRegistration.Validate(SampleUIConfiguration.Convert(row));
+                foreach (var row in table.Values) UIConfigRegistration.Validate(UISettingsMapping.Convert(row));
                 foreach (var group in profile.Pages.GroupBy(p => p.Profile, StringComparer.Ordinal))
                 {
                     var rows = table.Values.Where(r => r.Profile == group.Key).ToArray();
@@ -199,7 +199,7 @@ namespace YUIFramework.Editor
                             report.Add("ContextMapping", "Explicit concrete, closed Context class with a public parameterless constructor required: " + page.ContextType);
                         var row = rows.SingleOrDefault(r => r.Id == page.Id);
                         if (row == null) { report.Add("MissingUIRow", group.Key + "/" + page.Id, profile.UISettingsJson); continue; }
-                        UIConfigRegistration.Validate(SampleUIConfiguration.Convert(row));
+                        UIConfigRegistration.Validate(UISettingsMapping.Convert(row));
                         if (page.CodeBuiltDemo)
                         {
                             if (profile.Policy != UIBuildPolicy.MinimalDemo || !profile.DemoCodePageIds.Contains(page.Id))

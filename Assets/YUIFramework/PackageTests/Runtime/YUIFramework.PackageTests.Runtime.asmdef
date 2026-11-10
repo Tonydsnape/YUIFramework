@@ -1,0 +1,5 @@
+{
+  "name": "YUIFramework.PackageTests.Runtime",
+  "references": ["YUIFramework.Runtime", "UniTask"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

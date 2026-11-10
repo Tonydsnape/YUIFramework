@@ -8,7 +8,7 @@ using global::YooAsset;
 
 namespace YUIFramework.HotUpdate
 {
-    [Obsolete("Use BootstrapRunner and YooAssetBootstrapBackend through dependency injection.")]
+    [Obsolete("Use BootstrapRunner and YooAssetBootstrapBackend through dependency injection. Scheduled removal: 2.1.0.")]
     public sealed class HotUpdateManager
     {
         private static readonly HotUpdateManager Facade = new HotUpdateManager();

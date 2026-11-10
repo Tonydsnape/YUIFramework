@@ -166,10 +166,10 @@ namespace YUIFramework.Editor
                     $"            SetViewModel(new {n}ViewModel());\n            OnGeneratedInit();\n        }}\n        partial void OnGeneratedInit();\n    }}\n}}\n",
                 [n + "Registration.g.cs"] = header + $"namespace {ns}\n{{\n    public static class {n}Registration\n    {{\n" +
                     $"        public static YUIFramework.UIConfigRegistration Map(YUIFramework.Configuration.ConfigSnapshot snapshot) =>\n" +
-                    $"            YUIFramework.UIConfigRegistration.For<{n}Context>(YUIFramework.SampleUIConfiguration.Convert(\n" +
+                    $"            YUIFramework.UIConfigRegistration.For<{n}Context>(YUIFramework.ConfigGenerated.UISettingsMapping.Convert(\n" +
                     $"                snapshot.Get(YUIFramework.ConfigGenerated.UISettings.Table).Get({JsonConvert.SerializeObject(request.Profile)}, {JsonConvert.SerializeObject(request.Id)})));\n    }}\n}}\n",
                 [ns + "." + n + ".asmdef"] = JsonConvert.SerializeObject(new { name = ns + "." + n,
-                    references = new[] { "YUIFramework.Runtime", "YUIFramework.Config", "YUIFramework.Examples", "Unity.ugui", "Unity.TextMeshPro", "UniTask" } }, Formatting.Indented)
+                    references = new[] { "YUIFramework.Runtime", "YUIFramework.Config", "YUIFramework.ConfigGenerated", "Unity.ugui", "Unity.TextMeshPro", "UniTask" } }, Formatting.Indented)
             };
         }
         private static byte[] ProposeWorkbook(UIPageGenerationRequest request, string workbook)

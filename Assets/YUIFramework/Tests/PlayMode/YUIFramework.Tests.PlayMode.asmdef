@@ -2,6 +2,7 @@
   "name": "YUIFramework.Tests.PlayMode",
   "rootNamespace": "YUIFramework.Tests",
   "references": [
+    "YUIFramework.ConfigGenerated",
     "YUIFramework.Runtime",
     "YUIFramework.CodeLoading",
     "YUIFramework.Hotfix.Sample",

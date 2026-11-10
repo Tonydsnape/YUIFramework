@@ -1,6 +1,9 @@
 # Y1 to Y2 API Migration Matrix
 
-This matrix records intent before implementation. Final Y2 names may be refined during the public-contract phase, but ownership and behavior requirements are fixed here.
+This matrix records the implemented Y2 contracts and retained compatibility
+surfaces. All retained obsolete facades/aliases now name scheduled removal
+**2.1.0**. Follow [Migration.md](Migration.md) and
+[PackageQuickstart.md](PackageQuickstart.md) for an executable installed example.
 
 | Y1 surface | Y2 direction | Compatibility |
 |---|---|---|
@@ -89,5 +92,7 @@ This matrix records intent before implementation. Final Y2 names may be refined 
 
 - Compatibility code forwards to one Y2 implementation and never owns separate state.
 - Compatibility warnings identify the replacement and planned removal version.
+- The retained obsolete surface is scheduled for 2.1.0, not an unspecified migration window.
+- Package Editor depends on pure generated Config, not the optional business samples.
 - New samples and documentation use only Y2 APIs.
 - Breaking behavior changes require a migration note and a regression test.

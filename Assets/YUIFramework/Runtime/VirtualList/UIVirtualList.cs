@@ -20,7 +20,7 @@ namespace YUIFramework
     }
 #pragma warning restore CS0618
 
-    [Obsolete("Install the optional SuperScrollView integration and use SuperScrollViewList<T>. This facade is removed after the Y2 migration window.")]
+    [Obsolete("Install the optional SuperScrollView integration and use SuperScrollViewList<T>. Scheduled removal: 2.1.0.")]
     [RequireComponent(typeof(ScrollRect))]
     public class UIVirtualList : MonoBehaviour
     {

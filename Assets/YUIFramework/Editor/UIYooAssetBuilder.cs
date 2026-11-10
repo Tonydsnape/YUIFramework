@@ -16,12 +16,17 @@ namespace YUIFramework.Editor
     {
         public string Status, Package, Version, Target, Pipeline, Output, StartedUtc, EndedUtc, Error;
         public string[] Files, Sha256;
+        public string BuiltinOutput;
+        public string[] BuiltinFiles, BuiltinSha256;
         public string ReportPath;
         public ReportSummary Summary;
     }
     public static class UIYooAssetBuilder
     {
-        public static UIYooAssetBuildRecord Build(UIBuildProfile profile, CancellationToken token = default)
+        public static UIYooAssetBuildRecord Build(UIBuildProfile profile, CancellationToken token = default) =>
+            Build(profile, false, token);
+
+        internal static UIYooAssetBuildRecord Build(UIBuildProfile profile, bool includeBuiltinFiles, CancellationToken token = default)
         {
             if (!profile) throw new ArgumentNullException(nameof(profile));
             var record = new UIYooAssetBuildRecord { Package = profile.BuildPackage, Version = profile.PackageVersion,
@@ -52,16 +57,22 @@ namespace YUIFramework.Editor
                     throw new BuildFailedException("Bundle output must be outside and not an ancestor of the project.");
                 if (Directory.Exists(Path.Combine(output, profile.Target.ToString(), profile.BuildPackage, profile.PackageVersion)))
                     throw new BuildFailedException("Version output already exists; choose a new version. Existing release/user notes are never overwritten.");
+                var builtinRoot = Path.Combine(output, "bundled", profile.Target.ToString(), profile.PackageVersion);
+                if (includeBuiltinFiles)
+                {
+                    record.BuiltinOutput = UIExternalOutputs.NewPath(Path.Combine(builtinRoot, profile.BuildPackage));
+                }
                 Directory.CreateDirectory(output);
                 history = Path.Combine(output, "ui-build-history.jsonl");
                 token.ThrowIfCancellationRequested();
                 var parameters = new LegacyBuildParameters
                 {
-                    BuildOutputRoot = output, BundledFileRoot = Path.Combine(output, "bundled"),
+                    BuildOutputRoot = output, BundledFileRoot = builtinRoot,
                     BuildTarget = profile.Target, PackageName = profile.BuildPackage,
                     PackageVersion = profile.PackageVersion, BuildPipeline = profile.Pipeline,
                     BuildBundleType = (int)EBundleType.AssetBundle, VerifyBuildingResult = true,
-                    CompressOption = ECompressOption.LZ4, BundledCopyOption = EBundledCopyOption.None,
+                    CompressOption = ECompressOption.LZ4,
+                    BundledCopyOption = includeBuiltinFiles ? EBundledCopyOption.OnlyCopyAll : EBundledCopyOption.None,
                     UseAssetDependencyDB = false, EnableSharePackRule = true
                 };
                 // YooAsset 3's synchronous builder has no safe mid-task cancellation API.
@@ -79,6 +90,12 @@ namespace YUIFramework.Editor
                     record.Summary.BuildPackageName != profile.BuildPackage || record.Summary.BuildPackageVersion != profile.PackageVersion ||
                     record.Summary.BuildPipeline != profile.Pipeline)
                     throw new BuildFailedException("Official build report is absent or does not match the requested target/package/version/pipeline.");
+                if (includeBuiltinFiles)
+                {
+                    ValidateBuiltinOutput(record.BuiltinOutput);
+                    record.BuiltinFiles = Directory.GetFiles(record.BuiltinOutput).OrderBy(f => f, StringComparer.Ordinal).ToArray();
+                    record.BuiltinSha256 = record.BuiltinFiles.Select(Hash).ToArray();
+                }
             }
             catch (OperationCanceledException error) { record.Status = "CanceledBeforeBuild"; record.Error = error.ToString(); }
             catch (Exception error) { record.Status = "Failed"; record.Error = error.ToString(); }
@@ -88,6 +105,12 @@ namespace YUIFramework.Editor
                 if (history != null) File.AppendAllText(history, JsonUtility.ToJson(record) + Environment.NewLine);
             }
             return record;
+        }
+        internal static void ValidateBuiltinOutput(string path)
+        {
+            if (!File.Exists(Path.Combine(path, "BuiltinCatalog.bytes")) ||
+                new FileInfo(Path.Combine(path, "BuiltinCatalog.bytes")).Length == 0)
+                throw new BuildFailedException("YooAsset 3 Offline files require the official nonempty BuiltinCatalog.bytes, not just versioned patch output.");
         }
         private static void ValidateSegment(string value)
         {

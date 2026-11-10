@@ -11,6 +11,12 @@ namespace YUIFramework
     public class CodeViewLoader : IResourceLoader, System.IDisposable
     {
         private readonly Dictionary<string, GameObject> _prefabs = new Dictionary<string, GameObject>();
+        internal GameObject[] CaptureTemplates()
+        {
+            var result = new GameObject[_prefabs.Count];
+            _prefabs.Values.CopyTo(result, 0);
+            return result;
+        }
 
         public UniTask<GameObject> LoadPrefabAsync(
             string key,

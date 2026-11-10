@@ -58,6 +58,7 @@ namespace YUIFramework.Localization.Editor
         {
             if (SettingsInstance == null) throw new InvalidOperationException("Unsupported TMP settings cache; update Editor isolation for this TMP version.");
             var original = TMP_Settings.instance;
+            if (!original) throw new InvalidOperationException("TMP preview requires application TMP Essential Resources/settings. No source defaults are created by this preview.");
             if (!_settings)
             {
                 _settings = Copy(original);

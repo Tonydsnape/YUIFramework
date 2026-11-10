@@ -6,6 +6,23 @@ All notable changes to YUIFramework are documented in this file.
 
 ### Added
 
+- Stage 16 single-source private UPM exporter/inventory/verification, explicit
+  Editor-only boundaries and Config-generated assembly independent of examples.
+- Actual Samples~ declaration/Import, package-only test assemblies, complete
+  Bootstrap/YooAsset/UI flow and migrated Hello lifecycle regression; no commercial
+  local plugin, user dynamic font or verification outputs enter the package.
+- RC native-build/mobile-preflight entries, public API/package/migration/support
+  guides and an unwaived Android/iOS/device/license acceptance checklist.
+- RC/Player output preflight rejects unsafe/existing/linked/overlapping paths
+  before build effects; reports are create-new and YooAsset history remains
+  append-only. Core UnityLinker processing retains YooAsset's two reflected
+  production file-system constructors independently of sample Import.
+- Retained obsolete compatibility APIs now name scheduled removal 2.1.0;
+  supported bridges retain their GUIDs and the one underlying implementation.
+- Distributed startup samples drain shared Task-backed work safely and dispose
+  code-view templates; package-consumer Config paths and non-TMP content checks
+  no longer assume the original Assets layout or preinstalled TMP defaults.
+
 - Stage 15 independent public-only Hotfix.Sample and downstream AOT CodeLoading
   extension using existing Bootstrap code/game boundaries. Verified asynchronous
   DLL TextAsset leases, trusted identity/hash, explicit preloaded mock and Mono

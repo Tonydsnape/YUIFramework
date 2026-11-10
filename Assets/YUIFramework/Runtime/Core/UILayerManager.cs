@@ -57,7 +57,7 @@ namespace YUIFramework
             }
         }
 
-        [Obsolete("Use UILayerManager(UIRoot, UILayerProfile).")]
+        [Obsolete("Use UILayerManager(UIRoot, UILayerProfile). Scheduled removal: 2.1.0.")]
         public UILayerManager(UIRoot uiRoot)
             : this(uiRoot, UILayerProfile.CreateDefault())
         {

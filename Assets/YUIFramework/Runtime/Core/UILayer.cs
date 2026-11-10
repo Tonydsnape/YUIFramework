@@ -16,10 +16,10 @@ namespace YUIFramework
         System = 700,
         Debug = 800,
 
-        [System.Obsolete("Use Background. Bottom is a compatibility alias.")]
+        [System.Obsolete("Use Background. Bottom is a compatibility alias. Scheduled removal: 2.1.0.")]
         Bottom = Background,
 
-        [System.Obsolete("Use Toast. Top is a compatibility alias.")]
+        [System.Obsolete("Use Toast. Top is a compatibility alias. Scheduled removal: 2.1.0.")]
         Top = Toast,
     }
 }

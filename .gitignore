@@ -18,3 +18,5 @@
 *.mdb
 .DS_Store
 Thumbs.db
+TestResults-*.xml
+TestResults-*.log

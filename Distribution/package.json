@@ -1,0 +1,24 @@
+{
+  "name": "com.tonydsnape.yuiframework",
+  "version": "2.0.0-rc.1",
+  "displayName": "YUIFramework",
+  "description": "Instance-owned asynchronous Unity UI framework. Private release candidate; see NOTICE.md for distribution and validation boundaries.",
+  "unity": "2022.3",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "com.cysharp.unitask": "2.5.11",
+    "com.tuyoogame.yooasset": "3.0.5",
+    "com.unity.textmeshpro": "3.0.7",
+    "com.unity.ugui": "1.0.0",
+    "com.unity.nuget.newtonsoft-json": "3.2.1",
+    "com.unity.modules.screencapture": "1.0.0",
+    "com.unity.modules.androidjni": "1.0.0"
+  },
+  "samples": [
+    {
+      "displayName": "Complete UI flow",
+      "description": "Bootstrap, navigation, modal, MVVM, bounded list, localization and scene ownership; includes the existing migration and Hotfix boundary samples.",
+      "path": "Samples~/Complete"
+    }
+  ]
+}

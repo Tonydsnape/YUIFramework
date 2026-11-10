@@ -18,18 +18,18 @@ namespace YUIFramework
         void Publish<T>(UIMessageTopic<T> topic, T payload);
         int Count<T>(UIMessageTopic<T> topic);
 
-        [Obsolete("Use Subscribe(UIMessageTopic<UIMessageUnit>, ...). String message APIs will be removed after the Y2 migration window.")]
+        [Obsolete("Use Subscribe(UIMessageTopic<UIMessageUnit>, ...). Scheduled removal: 2.1.0.")]
         UIMessageToken Subscribe(string messageName, Action handler, object owner = null);
-        [Obsolete("Use Subscribe(UIMessageTopic<T>, ...). String message APIs will be removed after the Y2 migration window.")]
+        [Obsolete("Use Subscribe(UIMessageTopic<T>, ...). Scheduled removal: 2.1.0.")]
         UIMessageToken Subscribe<T>(string messageName, Action<T> handler, object owner = null);
-        [Obsolete("Use Publish(UIMessageTopic<UIMessageUnit>, UIMessageUnit.Value). String message APIs will be removed after the Y2 migration window.")]
+        [Obsolete("Use Publish(UIMessageTopic<UIMessageUnit>, UIMessageUnit.Value). Scheduled removal: 2.1.0.")]
         void Publish(string messageName);
-        [Obsolete("Use Publish(UIMessageTopic<T>, payload). String message APIs will be removed after the Y2 migration window.")]
+        [Obsolete("Use Publish(UIMessageTopic<T>, payload). Scheduled removal: 2.1.0.")]
         void Publish<T>(string messageName, T payload);
         void Unsubscribe(UIMessageToken token);
         void UnsubscribeOwner(object owner);
         void Clear();
-        [Obsolete("Use Count(UIMessageTopic<T>). String message APIs will be removed after the Y2 migration window.")]
+        [Obsolete("Use Count(UIMessageTopic<T>). Scheduled removal: 2.1.0.")]
         int Count(string messageName);
     }
 }

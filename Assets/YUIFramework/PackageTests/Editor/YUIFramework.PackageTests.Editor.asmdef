@@ -1,0 +1,8 @@
+{
+  "name": "YUIFramework.PackageTests.Editor",
+  "references": ["YUIFramework.Editor", "YUIFramework.Runtime", "YUIFramework.Config", "YUIFramework.ConfigGenerated", "Unity.Newtonsoft.Json", "YooAsset"],
+  "includePlatforms": ["Editor"],
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll", "Newtonsoft.Json.dll"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

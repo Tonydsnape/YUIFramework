@@ -3,7 +3,7 @@ using YUIFramework.Bootstrap;
 
 namespace YUIFramework.HotUpdate
 {
-    [Obsolete("Use BootstrapProgressUI as an injected IBootstrapProgressSink.")]
+    [Obsolete("Use BootstrapProgressUI as an injected IBootstrapProgressSink. Scheduled removal: 2.1.0.")]
     public sealed class HotUpdateProgressUI : BootstrapProgressUI
     {
         protected override void OnEnable()

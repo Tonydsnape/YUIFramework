@@ -1,6 +1,7 @@
 {
   "name": "YUIFramework.Examples",
   "references": [
+    "YUIFramework.ConfigGenerated",
     "YUIFramework.Runtime", "YUIFramework.Config", "YUIFramework.Config.Editor", "YUIFramework.Localization",
     "YUIFramework.Bootstrap", "YUIFramework.Bootstrap.YooAsset",
     "UniTask", "Unity.Newtonsoft.Json", "Unity.ugui", "Unity.TextMeshPro"

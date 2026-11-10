@@ -1,5 +1,19 @@
 # Y2 Runtime Contracts
 
+## Installed-package boundary
+
+The private UPM output is generated from the one Assets implementation; Runtime
+never depends on optional Examples/Hotfix business or Editor assemblies. Editor
+asmdefs explicitly restrict their platform. Config-generated schema/mapping is
+shared without referencing business examples. Samples compile only after real
+Import into Assets; package tests require consumer testables. See
+[PackageQuickstart](PackageQuickstart.md) and [PublicAPI](PublicAPI.md).
+
+Both manager construction paths still require concrete public-no-arg Context
+classes. Package-internal linker XML is not an application root in Unity 2022.3:
+the optional sample's real Import supplies its Assets rules. High stripping,
+concrete AOT instantiations and future HybridCLR metadata remain separate claims.
+
 ## Editor authoring and release policy
 
 Stage 14's [Editor tooling](EditorTooling.md) reuses the existing Config batches,

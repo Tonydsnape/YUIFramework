@@ -17,7 +17,9 @@ namespace YUIFramework.Localization.Editor
         {
             Directory.CreateDirectory(Folder);
             AssetDatabase.Refresh();
-            var source = AssetDatabase.LoadAssetAtPath<Font>("Assets/YUIFramework/ThirdParty/LXGWWenKai/LXGWWenKai-Regular.ttf");
+            var package = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(PresentationSampleAssets).Assembly);
+            var root = package == null ? "Assets/YUIFramework" : "Packages/" + package.name;
+            var source = AssetDatabase.LoadAssetAtPath<Font>(root + "/ThirdParty/LXGWWenKai/LXGWWenKai-Regular.ttf");
             if (!source) throw new InvalidOperationException("Install the verified WenKai Regular font first.");
             var primaryPath = Folder + "/WenKai.asset";
             var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(primaryPath);
@@ -54,6 +56,13 @@ namespace YUIFramework.Localization.Editor
                 if (!property.objectReferenceValue)
                 {
                     var rules = AssetDatabase.LoadAssetAtPath<TextAsset>(Folder + "/" + pair.Item2);
+                    if (!rules)
+                    {
+                        var candidates = AssetDatabase.GetAllAssetPaths().Where(path => path.StartsWith("Assets/", StringComparison.Ordinal) &&
+                            path.EndsWith("/Resources/YUIPresentation/" + pair.Item2, StringComparison.Ordinal)).ToArray();
+                        if (candidates.Length != 1) throw new InvalidOperationException("Import exactly one set of licensed TMP line-breaking resources.");
+                        rules = AssetDatabase.LoadAssetAtPath<TextAsset>(candidates[0]);
+                    }
                     if (!rules) throw new InvalidOperationException("Install the licensed TMP line-breaking resources.");
                     property.objectReferenceValue = rules;
                 }

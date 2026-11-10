@@ -52,8 +52,14 @@ namespace YUIFramework.Localization.Editor
         {
             if (!source) throw new ArgumentNullException(nameof(source));
             if (options.FontScale < .75f || options.FontScale > 2) throw new ArgumentOutOfRangeException(nameof(options.FontScale));
+            var localizationPath = options.LocalizationJson;
+            var presentationPath = options.PresentationJson;
+            if (localizationPath == "Assets/YUIFramework/ConfigData/Editor/json/LocalizationTextConfig.json" && !File.Exists(localizationPath))
+                localizationPath = EditorJsonConfigSource.FindSampleRoot() + "LocalizationTextConfig.json";
+            if (presentationPath == "Assets/YUIFramework/ConfigData/Editor/json/UIPresentationConfig.json" && !File.Exists(presentationPath))
+                presentationPath = EditorJsonConfigSource.FindSampleRoot() + "UIPresentationConfig.json";
             _configs = new ConfigService(new UIEditorFileConfigSource(new Dictionary<string, string>
-            { [LocalizationTextCatalog.Table.Name] = options.LocalizationJson, [UIPresentationCatalog.Table.Name] = options.PresentationJson }),
+            { [LocalizationTextCatalog.Table.Name] = localizationPath, [UIPresentationCatalog.Table.Name] = presentationPath }),
                 new ConfigCodec(), ConfigFormat.Json, new ConfigTable[] { LocalizationTextCatalog.Table, UIPresentationCatalog.Table });
             try
             {

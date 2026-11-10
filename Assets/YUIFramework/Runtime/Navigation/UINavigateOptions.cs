@@ -21,6 +21,7 @@ namespace YUIFramework
         /// 位置，永远会被提到栈顶，绝不会在栈中产生重复条目，无论这个字段是否设置。
         /// 见 Documentation/Y2.0/Navigation.md。
         /// </summary>
+        [System.Obsolete("Duplicate navigation always brings the existing page to the top. Scheduled removal: 2.1.0.")]
         public bool BringExistingPageToTop { get; set; } = true;
     }
 }

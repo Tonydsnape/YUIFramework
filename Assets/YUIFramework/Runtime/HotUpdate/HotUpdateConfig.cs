@@ -4,7 +4,7 @@ using YUIFramework.Bootstrap.YooAsset;
 
 namespace YUIFramework.HotUpdate
 {
-    [Obsolete("Use an immutable YUIFramework.Bootstrap.BootstrapProfile.")]
+    [Obsolete("Use an immutable YUIFramework.Bootstrap.BootstrapProfile. Scheduled removal: 2.1.0.")]
     public static class HotUpdateConfig
     {
         public const string DefaultPackageName = "DefaultPackage";

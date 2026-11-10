@@ -10,7 +10,7 @@ using YUIFramework.Bootstrap.YooAsset;
 
 namespace YUIFramework.HotUpdate
 {
-    [Obsolete("Compose and own BootstrapRunner explicitly in new startup code.")]
+    [Obsolete("Compose and own BootstrapRunner explicitly in new startup code. Scheduled removal: 2.1.0.")]
     public sealed class GameLauncher : MonoBehaviour, IBootstrapGameEntry
     {
         [Header("Bootstrap profile")]

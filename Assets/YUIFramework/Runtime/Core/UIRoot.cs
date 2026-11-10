@@ -17,7 +17,7 @@ namespace YUIFramework
         private UIRootRuntime _owner;
         private Action _restoreScaler;
 
-        [Obsolete("Inject UIRootRuntime into UIManager. Instance no longer creates or searches for objects.")]
+        [Obsolete("Inject UIRootRuntime into UIManager. Instance no longer creates or searches for objects. Scheduled removal: 2.1.0.")]
         public static UIRoot Instance
         {
             get

@@ -1,10 +1,14 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
+
+[assembly: InternalsVisibleTo("YUIFramework.Tests.EditMode")]
+[assembly: InternalsVisibleTo("YUIFramework.PackageTests.Editor")]
 
 namespace YUIFramework.Editor
 {
@@ -30,6 +34,7 @@ namespace YUIFramework.Editor
         }
         public static BuildReport BuildPlayer(BuildPlayerOptions options, UIBuildProfile profile)
         {
+            options.locationPathName = UIExternalOutputs.NewPath(options.locationPathName);
             if (_buildingScenes != null) throw new InvalidOperationException("A UI Player build is already in progress.");
             if (!profile || options.target != profile.Target) throw new BuildFailedException("Explicit matching target profile is required.");
             ValidateForBuild(profile, options.scenes);
@@ -93,8 +98,76 @@ namespace YUIFramework.Editor
         internal static void RejectLinkedAncestors(string path)
         {
             for (var directory = new DirectoryInfo(Path.GetFullPath(path)); directory != null; directory = directory.Parent)
-                if (directory.Exists && (directory.Attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                FileAttributes attributes;
+                try { attributes = File.GetAttributes(directory.FullName); }
+                catch (FileNotFoundException) { continue; }
+                catch (DirectoryNotFoundException) { continue; }
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
                     throw new ArgumentException("Choose a literal output path without symlinks or junctions: " + directory.FullName);
+            }
+        }
+    }
+
+    internal static class UIExternalOutputs
+    {
+        internal static string NewPath(string path)
+        {
+            var full = ExternalPath(path);
+            if (File.Exists(full) || Directory.Exists(full))
+                throw new IOException("Output already exists; choose a new path: " + full);
+            return full;
+        }
+
+        internal static string BundleRoot(string path)
+        {
+            var full = ExternalPath(path);
+            if (File.Exists(full)) throw new IOException("Bundle root is a file: " + full);
+            // Existing roots retain YooAsset's append-only version/history policy.
+            return full;
+        }
+
+        private static string ExternalPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !Path.IsPathRooted(path))
+                throw new ArgumentException("Choose an absolute external output path.");
+            var full = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (!string.Equals(Path.GetPathRoot(path).Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar),
+                Path.GetPathRoot(Path.GetFullPath(path)), StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Drive-relative output paths are not allowed.");
+            var project = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            if (Inside(full, project) || Inside(project, full))
+                throw new ArgumentException("Output must be outside and not an ancestor of the project.");
+            UIBuildGate.RejectLinkedAncestors(full);
+            for (var parent = Directory.GetParent(full); parent != null; parent = parent.Parent)
+                if (File.Exists(parent.FullName))
+                    throw new IOException("Output parent is a file: " + parent.FullName);
+            if (Path.DirectorySeparatorChar == '\\' && full.Substring(Path.GetPathRoot(full).Length)
+                .Split('\\').Any(segment => segment.EndsWith(".", StringComparison.Ordinal) ||
+                    segment.EndsWith(" ", StringComparison.Ordinal) || segment.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0))
+                throw new ArgumentException("Output contains an ambiguous or invalid Windows path segment.");
+            return full;
+        }
+
+        internal static void RequireDisjoint(params string[] paths)
+        {
+            for (var i = 0; i < paths.Length; ++i)
+                for (var j = i + 1; j < paths.Length; ++j)
+                    if (Inside(paths[i], paths[j]) || Inside(paths[j], paths[i]))
+                        throw new ArgumentException("Player, report and bundle outputs must be distinct and non-nested.");
+        }
+
+        private static bool Inside(string path, string parent) =>
+            path.Equals(parent, StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith(parent + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+
+        internal static void WriteNewReport(string path, string contents)
+        {
+            var full = NewPath(path);
+            Directory.CreateDirectory(Path.GetDirectoryName(full));
+            using var stream = new FileStream(full, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            using var writer = new StreamWriter(stream);
+            writer.Write(contents);
         }
     }
 }

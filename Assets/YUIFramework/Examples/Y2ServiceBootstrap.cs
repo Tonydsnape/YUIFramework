@@ -22,10 +22,11 @@ namespace YUIFramework.Examples
         {
             _uiService = new UIManager();
             var configOwner = new SampleConfigOwner();
+            using var views = new CodeViewLoader();
             try
             {
                 await _uiService.InitializeAsync(
-                    new CodeViewLoader(),
+                    views,
                     cancellationToken: cancellationToken);
                 await ConfigUIStartup.EnterAsync(configOwner.Service, _uiService,
                     snapshot => SampleUIConfiguration.Map(snapshot, "y2"), async token =>

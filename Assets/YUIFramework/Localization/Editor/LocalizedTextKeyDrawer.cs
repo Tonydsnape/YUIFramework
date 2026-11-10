@@ -10,7 +10,7 @@ namespace YUIFramework.Localization.Editor
 {
     public static class LocalizedTextEditorCatalog
     {
-        public const string RelativePath = "Assets/YUIFramework/ConfigData/Editor/json/LocalizationTextConfig.json";
+        public static string RelativePath => EditorJsonConfigSource.FindSampleRoot() + "LocalizationTextConfig.json";
         public static LocalizationTextCatalog Load(string path) =>
             LocalizationTextCatalog.Parse(new ConfigCodec().Decode(File.ReadAllBytes(path), ConfigFormat.Json));
         public static void ApplySelection(UnityEngine.Object[] targets, string propertyPath, string key)

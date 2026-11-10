@@ -424,7 +424,7 @@ namespace YUIFramework
             GetMessageBus().Publish(topic, payload);
         }
 
-        [Obsolete("Use SubscribeMessage(UIMessageTopic<UIMessageUnit>, ...). String message APIs will be removed after the Y2 migration window.")]
+        [Obsolete("Use SubscribeMessage(UIMessageTopic<UIMessageUnit>, ...). Scheduled removal: 2.1.0.")]
         protected UIMessageToken SubscribeMessage(string messageName, Action handler)
         {
             return SubscribeMessage(
@@ -432,13 +432,13 @@ namespace YUIFramework
                 _ => handler());
         }
 
-        [Obsolete("Use SubscribeMessage(UIMessageTopic<T>, ...). String message APIs will be removed after the Y2 migration window.")]
+        [Obsolete("Use SubscribeMessage(UIMessageTopic<T>, ...). Scheduled removal: 2.1.0.")]
         protected UIMessageToken SubscribeMessage<T>(string messageName, Action<T> handler)
         {
             return SubscribeMessage(new UIMessageTopic<T>(messageName), handler);
         }
 
-        [Obsolete("Use PublishMessage(UIMessageTopic<UIMessageUnit>, UIMessageUnit.Value). String message APIs will be removed after the Y2 migration window.")]
+        [Obsolete("Use PublishMessage(UIMessageTopic<UIMessageUnit>, UIMessageUnit.Value). Scheduled removal: 2.1.0.")]
         protected void PublishMessage(string messageName)
         {
             PublishMessage(
@@ -446,7 +446,7 @@ namespace YUIFramework
                 UIMessageUnit.Value);
         }
 
-        [Obsolete("Use PublishMessage(UIMessageTopic<T>, payload). String message APIs will be removed after the Y2 migration window.")]
+        [Obsolete("Use PublishMessage(UIMessageTopic<T>, payload). Scheduled removal: 2.1.0.")]
         protected void PublishMessage<T>(string messageName, T payload)
         {
             PublishMessage(new UIMessageTopic<T>(messageName), payload);
@@ -476,7 +476,7 @@ namespace YUIFramework
             return token;
         }
 
-        [Obsolete("Use SubscribeDisplayMessage(UIMessageTopic<UIMessageUnit>, ...). String message APIs will be removed after the Y2 migration window.")]
+        [Obsolete("Use SubscribeDisplayMessage(UIMessageTopic<UIMessageUnit>, ...). Scheduled removal: 2.1.0.")]
         protected UIMessageToken SubscribeDisplayMessage(string messageName, Action handler)
         {
             return SubscribeDisplayMessage(
@@ -484,7 +484,7 @@ namespace YUIFramework
                 _ => handler());
         }
 
-        [Obsolete("Use SubscribeDisplayMessage(UIMessageTopic<T>, ...). String message APIs will be removed after the Y2 migration window.")]
+        [Obsolete("Use SubscribeDisplayMessage(UIMessageTopic<T>, ...). Scheduled removal: 2.1.0.")]
         protected UIMessageToken SubscribeDisplayMessage<T>(string messageName, Action<T> handler)
         {
             return SubscribeDisplayMessage(new UIMessageTopic<T>(messageName), handler);

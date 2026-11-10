@@ -2,7 +2,9 @@
 
 Y2.0 uses one development line and advances through strict stage gates. Only one stage is implemented at a time. Code, tests, documentation, and acceptance must be complete before the next stage begins.
 
-**Progress: stages 0-15 complete (16 of 17 stages). Stage 16 has not started.**
+**Progress: stages 0-15 complete. Stage 16 local implementation and executable
+host gates are delivered for review; original acceptance remains blocked by
+Android device UI smoke and native iOS/device evidence. No mobile gate is waived.**
 
 Independent post-stage-10 work: **Config integration complete**. This connects the
 Excel toolchain, atomic typed snapshots and existing UI registrations; it does not
@@ -80,7 +82,7 @@ See [HybridCLRBoundary.md](HybridCLRBoundary.md) and [Testing.md](Testing.md).
 | 13 (complete) | Diagnostics and performance budgets | Runtime state, ownership, operations, leaks, timings, and uGUI cost can be inspected |
 | 14 (complete) | Editor tooling and build gates | Generation, prefab/resource/performance checks, previews, and YooAsset reports block invalid builds |
 | 15 (complete) | HybridCLR boundary validation | Public-only Hotfix, verified-resource code extension, actual IL2CPP High retained-member/native build, separate stripped Mono execution, generic witnesses and future metadata draft verified |
-| 16 | Package and release candidate | UPM layout, samples, migration, docs, tests, and Android/iOS development-build smoke tests pass |
+| 16 (local work delivered; mobile acceptance blocked) | Package and release candidate | UPM, real fresh consumer/Import, migration/docs/full tests and Android High build verified; Android device UI and iOS native/device gates not passed |
 
 ## Stage protocol
 

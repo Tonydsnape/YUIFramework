@@ -1,6 +1,145 @@
 # Y2.0 Testing Baseline
 
-## Stage 15 lifecycle revision (current)
+## Stage 16 local implementation evidence; mobile acceptance blocked
+
+These are actual Unity **2022.3.62f2** results on **2026-11-04 UTC**, not promises
+or replacements for device gates. Source HEAD is
+`26e405da8e46b3ac73b24389fc4cad14bb478c76` plus the uncommitted stage-16
+snapshot. The review index is `stage16-acceptance-local-final.json` in the session
+evidence directory. No commit, staging, push or package publication was performed.
+
+### Complete isolated and clean-consumer runs
+
+| Gate / actual XML | Passed / total | UTC interval | Seconds |
+|---|---:|---|---:|
+| `stage16-final10-installed-EditMode.xml` | 270/275 | 09:52:35-09:53:21 | 45.6923964 |
+| `stage16-final10-installed-PlayMode.xml` | 223/223 | 09:53:35-09:54:05 | 30.3189733 |
+| `stage16-final10-no-vendor-EditMode.xml` | 270/275 | 09:52:38-09:53:22 | 43.3428697 |
+| `stage16-final10-no-vendor-PlayMode.xml` | 208/208 | 09:53:37-09:54:04 | 27.031109 |
+| `stage16-final9-fresh-base-EditMode.xml` | 5/5 | 09:49:45-09:49:45 | .0849458 |
+| `stage16-final9-fresh-base-PlayMode.xml` | 1/1 | 09:49:55-09:49:55 | .1279844 |
+| `stage16-final9-fresh-imported-EditMode.xml` | 5/5 | 09:52:56-09:52:56 | .1042881 |
+| `stage16-final9-fresh-imported-PlayMode.xml` | 5/5 | 09:53:07-09:53:13 | 5.6091415 |
+
+The five full-suite Edit skips are the existing stage-14 Explicit producers, not
+silently waived failures. All five were additionally executed against this source
+in their required isolated/renderer processes:
+
+| Actual XML | Coverage | Passed | UTC / seconds |
+|---|---|---:|---|
+| `stage16-final-editor-explicit-EditMode.xml` | Negative real Player preprocess; generator rollback/idempotence/hand code; official bundle/report/version/history | 3 | 10:14:27-10:14:50 / 22.3989549 |
+| `stage16-final-renderer-EditMode.xml` | Non-Null real Editor camera, safe-area pixels and French text | 1 | 10:15:56 / .5470543 |
+| `stage16-final-authoring-compiled-EditMode.xml` | Fresh generated C# assembly, four serialized duplicate-name controls, ViewModel, exported Config row, typed batch map, real Open/Close/release | 1 | 10:20:49 / .5249583 |
+
+The authoring producer runs the unchanged Config exporter only in its derived
+project; it does not edit the author's Excel/11 registrations or install new
+dependencies. Original stage-9/10 local GC assertions remain unchanged; neither
+these nor the complete-flow list certify full-frame 0-B, FPS or mobile budgets.
+
+`Stage16PackagingTests` covers reproducible exports/tampering, no-TMP fresh
+content, relative/internal/ancestor/existing/overlapping output rejection,
+Windows junctions, unchanged marker/report/settings/StreamingAssets on rejection,
+create-new report parents and rejection of missing builtin catalog. Package-only
+tests additionally prove Editor platform/API boundaries and actual linker callback
+rules **before sample Import**. Eighteen focused cases passed in
+`stage16-catalog-directed-EditMode.xml` (09:33:46-09:34:12, 26.3329562 s).
+
+The new consumer starts with **zero copied business Assets**, a nonembedded file
+dependency and manifest.testables. Actual Unity `Sample.Import` creates compiling
+Examples/Hotfix assemblies and an Assets linker root. Imported Play tests exercise
+real Bootstrap/marker, immediate destruction while actual Start is pending,
+migrated visible Hello presentation, complete flow and package lifecycle.
+
+### Actual native builds and independent desktop execution
+
+| Report | Target / backend / stripping | Actual UTC interval | Build seconds / total build bytes |
+|---|---|---|---|
+| `stage16-final9-native-reports/android-build.json` | Android ARM64 / IL2CPP / High / Development | 09:55:47.4498007-09:57:48.3893967 | 111.4463326 / 394,390,553 |
+| `stage16-final9-native-reports/mono-rc-build.json` | Windows64 / Mono / High / Development | 09:47:18.9236731-09:47:46.8271367 | 19.1393135 / 107,912,701 |
+| `stage16-final9-mono-high.json` | Windows64 Hotfix boundary / Mono / High / Development | 09:55:28.8899261-09:55:57.1143551 | 27.7703449 / 107,910,067 |
+
+All three BuildReports have zero errors. Android APK size is **35,717,986 bytes**,
+not total build bytes. Its actual zip inventory includes ARM64 libil2cpp,
+global-metadata and **BuiltinCatalog.bytes**. Official `OnlyCopyAll`/catalog tasks
+produce the builtin set in a new external version directory; merely copying patch
+output was insufficient. Evidence retains the official report, hashes and history.
+
+The core UnityLinker callback supplies two precise default-constructor rules for
+YooAsset Builtin/Sandbox file systems, independently of sample import.
+`stage16-final9-yoo-stripped.json` inspects both in the actual Android stripped
+YooAsset.dll. `stage16-final9-{android-hotfix,mono}-stripped.json` separately
+inspects the retained Context ctors, generic Open and Type-prewarm paths.
+This is not unknown generic/native execution or HybridCLR certification.
+
+Actual desktop processes both exit **0**:
+
+- `stage16-final9-mono-rc-execution.json`, 09:48:21.528961-09:48:26.830909:
+  real Offline package initialization/marker, **nine** navigation/modal/MVVM/list/
+  locale/scene checks, UI shutdown, restored scene and destroyed templates.
+  Null graphics explicitly reports screenshot **Unavailable**.
+- `stage16-final9-mono-execution.json`, 10:02:06.894350-10:02:10.511280:
+  reflected entry, generic Open, Type-prewarm, concrete generic witness **8**,
+  cleanup; no downloaded DLL execution on stock IL2CPP is claimed.
+
+### Android device and iOS: not passed
+
+Device failures remain evidence, not successful runs. The first APK exposed a
+High-stripped YooAsset default ctor; the next authorized device run confirmed
+file-system construction but failed with a missing official builtin catalog (404).
+Both root causes were fixed and the later actual APK/stripped/desktop Offline
+evidence above reflects those fixes.
+
+`stage16-final9-device-evidence.json` records the latest authorized update:
+installation **succeeded**, but `am start -W` timed out. App-specific logs show
+onResume followed by onPause before entering Unity; the activity is stopped and
+there is **no valid current-run smoke JSON or screenshot**. No functional device
+pass or rendered Android UI is claimed. Further install/launch/foreground/device
+changes were stopped; unattended coordination cannot certify a user's foreground/
+bright-screen action. The dedicated test application remains installed.
+
+`stage16-final9-native-reports/ios-preflight.json` records **moduleAvailable=true**
+and complete scoped MinimalDemo validation, but status **Blocked** with
+`iOSNativeHostUnavailable`: this Windows host has no macOS/Xcode native signing/
+build/device environment. No iOS native build or device run occurred. No new
+HybridCLR, SDK/toolchain, cloud resources, metadata or DLL publication was added.
+**Stage 16's original mobile gates and full RC acceptance remain blocked.**
+
+### Identity, package/document correspondence and diagnostic boundaries
+
+Full Assets/Packages/ProjectSettings maps have **795** installed inputs and
+**727** without vendor. Each final10 pre-source = pre-copy = post-source =
+post-copy: zero missing/extra/mismatch and no synchronization after runs.
+SHA256 of their canonical JSON maps is respectively
+`2bb44469d516154c6f394d9361900b60dc726a4eb1e7ea8783c6e66266caa3b5` and
+`44ae130c255fd4734621940b9a284d059d115e4e28beb67f691fcc8a415e8630`.
+The 47 baseline tracked login/Config inputs checked by the final audit are
+unchanged. The original dirty .gitignore/font and info/exclude remain protected.
+
+Runtime/native/consumer evidence uses **rc9**; final documentation is exported
+in **rc10**. The final index records a manifest comparison proving only documents
+and their inventory differ: no runtime, Editor, sample, test, Config, package
+dependency or metadata bytes differ. Final rc10 is verified after import too.
+Pure documentation does not trigger a pretend rerun of native builds.
+Android consumer build maps preserve all 147 pre-existing inputs and add only
+13 intended builtin files/metas; no source/profile/settings file is changed.
+
+Final installed logs have zero C# errors/warnings; no-vendor Edit has **ten
+CS0618 log occurrences for five intentionally exercised compatibility members**
+(duplicated by compiler reporting). Both full Edit logs contain two intentional
+diagnostic negative-test exception lines, and Play logs three each. They retain
+four/three Debug warning calls and one unavailable licensing access-token notice.
+No continuation-registration, NRE or Unobserved failures appear. The separate
+negative Player producer intentionally emits build failure diagnostics; it is
+not a successful-build warning-free claim.
+
+Raw logs remain local. `stage16-final-review-log-manifest.json` links raw hashes
+to **redacted** `stage16-final-review-logs` copies, removing launcher environment
+assignments/credential lines and APK installation identifiers. Review copies,
+not raw Android environment dumps, are the handoff logs. Earlier no-XML selector,
+metadata-normalization, missing-catalog/device and stalled SDK-list attempts are
+kept separately and are not mixed into passing final runs.
+
+## Stage 15 lifecycle revision (historical accepted baseline)
 
 The initial `final4` evidence below did **not** cover destroying the real sample
 while Start was pending. The added regression first failed against the unchanged

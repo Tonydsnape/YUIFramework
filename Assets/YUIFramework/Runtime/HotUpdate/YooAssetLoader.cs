@@ -7,7 +7,7 @@ using YUIFramework.Bootstrap.YooAsset;
 
 namespace YUIFramework.HotUpdate
 {
-    [Obsolete("Initialize UIManager with YooAssetBootstrapComposition.ResourceService.")]
+    [Obsolete("Initialize UIManager with YooAssetBootstrapComposition.ResourceService. Scheduled removal: 2.1.0.")]
     public sealed class YooAssetLoader : IResourceLoader
     {
         private readonly IUIResourceService _resourceService;

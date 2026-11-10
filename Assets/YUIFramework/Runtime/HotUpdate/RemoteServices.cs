@@ -6,7 +6,7 @@ using global::YooAsset;
 
 namespace YUIFramework.HotUpdate
 {
-    [Obsolete("YooAssetBootstrapBackend owns remote URL resolution.")]
+    [Obsolete("YooAssetBootstrapBackend owns remote URL resolution. Scheduled removal: 2.1.0.")]
     public sealed class RemoteServices : IRemoteService
     {
         public bool UseBuildinManifestSource { get; set; }

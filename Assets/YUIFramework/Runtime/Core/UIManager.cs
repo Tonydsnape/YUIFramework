@@ -47,12 +47,13 @@ namespace YUIFramework
         private bool _initialized;
         private Task _shutdownTask;
 
+        [Obsolete("Inject an owned IUIService/UIManager instance. Scheduled removal: 2.1.0.")]
         public static UIManager Instance => LazyInstance.Value;
 
         public UINavigator Navigator { get; private set; }
         public UIMessageCenter MessageCenter { get; private set; }
         public UITransitionRunner Transitions => _transitionRunner;
-        [Obsolete("Use Transitions. TransitionRunner will be removed after the Y2 migration window.")]
+        [Obsolete("Use Transitions. Scheduled removal: 2.1.0.")]
         public UITransitionRunner TransitionRunner => Transitions;
         public UIRootRuntime RootRuntime => _rootRuntime;
         /// <summary>
@@ -95,7 +96,7 @@ namespace YUIFramework
             Diagnostics = diagnostics;
         }
 
-        [Obsolete("Use Initialize on an injected IUIService. UIManager.Init will be removed after the Y2 migration window.")]
+        [Obsolete("Use Initialize on an injected IUIService. Scheduled removal: 2.1.0.")]
         public void Init(IResourceLoader loader, IUIObjectPool pool = null)
         {
             Initialize(loader, pool);
